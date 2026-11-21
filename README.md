@@ -4,6 +4,7 @@
 
 | 從哪裡讀 | 內容 |
 |---|---|
+| [會後現況與預期差異](docs/hugagent/meeting-brief.md) | 從 W7、W8 的構想到資料實查，說明洩漏如何改變建圖方式、第一輪能回答什麼，以及不同結果如何解讀 |
 | [會議與第一輪決策](docs/hugagent/round-one.md) | W7、W8 到這輪設計的沿革、資料核對、比較的解讀、後續實作入口 |
 | [完整研究設計](docs/hugagent/HugAgent-54-Research-Design.md) | 提供的原稿。含六筆真題、圖語義、工具操作、網站布局、跨域與 Rank |
 | [原始實作 prompt](docs/hugagent/LLME-Implementation-Prompt.md) | 保留原稿供未來 coding agent 參考。第一輪請從決策文件末段的交接指令開始 |
