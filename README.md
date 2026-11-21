@@ -14,6 +14,6 @@
 
 ## 本機真人資料瀏覽器
 
-以瀏覽器開啟 [HugAgent 資料檢視器](ref/HugAgent/index.html)。資料來源改為 [egger-meow/HugAgent 固定版本](https://github.com/egger-meow/HugAgent/tree/ea0d98111394a017be79cf7a1e6accbe47e95559/Benchmark/data)。六份 JSONL 與 LICENSE 放在 `ref/HugAgent/data`，在 repo 根目錄執行 `python tools/hugagent/build.py` 可驗證六檔雜湊並重建 HTML。下載檔與含訪談的 HTML 依設定留在本機。
+以瀏覽器開啟 [HugAgent 資料檢視器](ref/HugAgent/index.html)。資料來源改為 [egger-meow/HugAgent 固定版本](https://github.com/egger-meow/HugAgent/tree/2bbd18e76db4be1de3b5bce3b5e239898a6a2750/Benchmark/data)。六份 JSONL 與 LICENSE 放在 `ref/HugAgent/data`，在 repo 根目錄執行 `python tools/hugagent/build.py` 可驗證六檔雜湊並重建 HTML。下載檔與含訪談的 HTML 依設定留在本機。
 
-先前文件的實查與 scorer 基準使用上游 data-v1.1。fork 的都市分區 Task 2 含有不同的理由題與真人答案，後續評分、理由配對與基準應依 fork 重新計算。兩版在 54 人、1,742 題、460 份訪談輸入、271 題跨題重現遮蔽 QA 的統計一致。
+同步後的 fork 六份真人 JSONL 均與研究設計記錄的 data-v1.1 SHA-256 相符。
