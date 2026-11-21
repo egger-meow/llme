@@ -8,5 +8,7 @@
     "belief_dynamics_update_healthcare.jsonl": "14477b9f47844311aa69b3f906c4b56f366662e252c6824ddff7d06911243e23"
   },
   "revision": "2bbd18e76db4be1de3b5bce3b5e239898a6a2750",
-  "repository": "egger-meow/HugAgent"
+  "repository": "egger-meow/HugAgent",
+  "license_sha256": "6be08b703c92d53e7a87de805880acccba7f4fbc13e33563d01ff720c918c72a",
+  "scorer_sha256": "6aac1e6d2ba23821e2b759a7d589b09927eb737a229134ad56d98831847291d4"
 }
