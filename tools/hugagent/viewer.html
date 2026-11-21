@@ -4,7 +4,17 @@
 </style><header><small>LLME　／　HugAgent 真人資料</small><h1>從一個人，讀到一道題</h1><div id="stats"></div></header><main>
 <section><h2>資料怎麼切</h2><table><thead><tr><th>領域</th><th>Task 1 · 信念方向</th><th>Task 2 · 立場與理由</th></tr></thead><tbody id="counts"></tbody></table>
 <p>每個數字代表一個 JSONL 檔中的題數。一行是一道題，同一人可以出現多次。每題各自附有可見的訪談；同人、同域、內容與順序相同的 QA 才共用一個訪談編號。</p>
-<button id="demo">看 P07 的 19 段與 20 段訪談</button></section>
+</section>
+<section><h2>為什麼合併訪談會洩漏答案？</h2>
+<p>同一位受訪者 P07，同一個主題「公共監控」。</p>
+<ol>
+<li><strong>Task 1 要猜什麼？</strong> P07 認為，警方必須為濫用監控負責，會提高還是降低人們對監控攝影機的支持？</li>
+<li><strong>哪一句被藏起來？</strong> P07 在訪談中說，如果人們覺得警方會被追究責任，就會更信任警方與監控攝影機。這就是選「正向」的直接依據。Task 1 的 19 段可見訪談裡拿掉了這一段。</li>
+<li><strong>去哪裡找回這句？</strong> 另一道 Task 2 附帶的 20 段訪談中，第 11 段保留了這句。若把兩份訪談合在一起給 Task 1，模型就能直接讀到原本藏起來的回答。</li>
+</ol>
+<button id="demo">看 Task 1 藏起來的原文</button>
+<button id="demo-t2">看 Task 2 訪談第 11 段</button>
+</section>
 <section><h2>逐題檢視</h2><label>受訪者<select id="person"></select></label><label>領域<select id="domain"></select></label><label>任務<select id="task"></select></label><label style="display:grid">題目<select id="item"></select></label></section>
 <article id="detail"></article><small>本機研究視圖 · HugAgent Authors · CC BY-NC 4.0 · <a href="data/LICENSE">資料授權</a></small></main><script>
 const db=/*DATA*/null;
@@ -31,10 +41,17 @@ function qa(q){return '<b>'+esc(q.question)+'</b><blockquote>'+esc(q.answer)+'</
 function render(){const x=byId.get(el('item').value),r=x.row,h=db.scopes[x.scope],related=db.items.filter(y=>y.scope===x.scope);
 const leak=x.leak&&byId.get(x.leak[0]);
 const scoring=r.source_qa?{answer:r.answer,reasoning:r.reasoning,source_qa:r.source_qa}:{user_answer:r.user_answer};
-el('detail').innerHTML='<small>'+esc(x.file)+' · 第 '+x.line+' 行 · <a href="https://github.com/'+db.source.repository+'/blob/'+db.source.revision+'/Benchmark/data/'+x.file+'#L'+x.line+'">fork 原檔</a></small><h2>'+esc(r.participant_id)+' ／ '+domains[r.topic]+' ／ '+kind(x)+'</h2><h3>預測器看到的問題</h3><code>task_question</code><p>'+esc(r.task_question)+'</p>'+pretty(r.answer_options||{scale:r.scale,...(r.reason_text?{reason_text:r.reason_text}:{})})+'<details><summary>受訪背景 · demographics</summary>'+pretty(r.demographics)+'</details><details><summary>可見訪談 · context_qas · '+h.length+' 段</summary><p>Raw 直接讀這些 QA。Graph 預計從同一份 QA 抽取主張與引文，Flat 再將相同主張攤成文字。目前可檢視原始證據。</p>'+h.map((q,i)=>'<small>第 '+(i+1)+' 段 · 原編號 '+esc(q.question_number)+'</small><p>'+qa(q)+'</p>').join('')+'</details><details><summary>共用訪談 #'+(x.scope+1)+' 的 '+related.length+' 道題</summary>'+related.map(y=>'<button data-id="'+esc(y.row.item_id)+'">'+esc(y.row.item_id)+'</button>').join(' ')+'</details><details><summary>揭開評分欄位'+(leak?'與跨題洩漏對照':'')+'</summary>'+pretty(scoring)+(leak?'<h3>若按人合併會看到什麼？</h3><p>本題遮住的 source_qa，在另一題 '+db.scopes[leak.scope].length+' 段訪談的第 '+(x.leak[1]+1)+' 段逐字出現。</p>'+qa(db.scopes[leak.scope][x.leak[1]])+'<button data-id="'+leak.row.item_id+'">查看 '+leak.row.item_id+'</button>':'')+'</details><details><summary>完整 JSONL 原始欄位</summary>'+pretty({...r,context_qas:h})+'</details>';
+el('detail').innerHTML='<small>'+esc(x.file)+' · 第 '+x.line+' 行 · <a href="https://github.com/'+db.source.repository+'/blob/'+db.source.revision+'/Benchmark/data/'+x.file+'#L'+x.line+'">fork 原檔</a></small><h2>'+esc(r.participant_id)+' ／ '+domains[r.topic]+' ／ '+kind(x)+'</h2><h3>預測器看到的問題</h3><code>task_question</code><p>'+esc(r.task_question)+'</p>'+pretty(r.answer_options||{scale:r.scale,...(r.reason_text?{reason_text:r.reason_text}:{})})+'<details><summary>受訪背景 · demographics</summary>'+pretty(r.demographics)+'</details><details><summary>可見訪談 · context_qas · '+h.length+' 段</summary><p>Raw 直接讀這些 QA。Graph 預計從同一份 QA 抽取主張與引文，Flat 再將相同主張攤成文字。目前可檢視原始證據。</p>'+h.map((q,i)=>'<small id="qa-'+(i+1)+'">第 '+(i+1)+' 段 · 原編號 '+esc(q.question_number)+'</small><p>'+qa(q)+'</p>').join('')+'</details><details><summary>共用訪談 #'+(x.scope+1)+' 的 '+related.length+' 道題</summary>'+related.map(y=>'<button data-id="'+esc(y.row.item_id)+'">'+esc(y.row.item_id)+'</button>').join(' ')+'</details><details><summary>揭開評分欄位'+(leak?'與跨題洩漏對照':'')+'</summary>'+pretty(scoring)+(leak?'<h3>若按人合併會看到什麼？</h3><p>本題遮住的 source_qa，在另一題 '+db.scopes[leak.scope].length+' 段訪談的第 '+(x.leak[1]+1)+' 段逐字出現。</p>'+qa(db.scopes[leak.scope][x.leak[1]])+'<button data-id="'+leak.row.item_id+'">查看 '+leak.row.item_id+'</button>':'')+'</details><details><summary>完整 JSONL 原始欄位</summary>'+pretty({...r,context_qas:h})+'</details>';
 }
 function demo(){refresh(byId.get('belief_state_inference-surveillance-0009'));el('detail').querySelectorAll('details')[3].open=true}
 el('detail').onclick=e=>{if(e.target.dataset.id)refresh(byId.get(e.target.dataset.id))};
+el('demo-t2').onclick=()=>{
+const t1=byId.get('belief_state_inference-surveillance-0009');
+refresh(byId.get(t1.leak[0]));
+const match=el('qa-'+(t1.leak[1]+1));
+match.closest('details').open=true;
+match.scrollIntoView();
+};
 el('demo').onclick=()=>{demo();el('detail').scrollIntoView()};for(const id of ['person','task','domain'])el(id).onchange=()=>refresh();el('item').onchange=render;
 refresh(byId.get('belief_state_inference-surveillance-0009'));
 </script></html>
