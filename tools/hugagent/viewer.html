@@ -1,0 +1,40 @@
+<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HugAgent · 訪談資料圖譜</title><style>
+*{box-sizing:border-box}body{margin:0;background:#f5f3eb;color:#17352f;font:16px/1.6 "Segoe UI",sans-serif}main{max-width:1120px;margin:auto;padding:32px 5%}header{background:#163f38;color:#fff;padding:30px max(5%,calc((100vw - 1010px)/2))}h1{margin:0;font-size:clamp(30px,5vw,50px)}h2{margin:0 0 12px}h3{margin:10px 0}small,code{overflow-wrap:anywhere}section,article{background:#fffef9;border:1px solid #d4ded4;border-radius:12px;padding:20px;margin:14px 0}label{display:inline-grid;margin:4px 10px 4px 0;font-size:14px}select,button{font:inherit;padding:7px;color:#17352f;max-width:100%}button,summary,select{cursor:pointer}button{border:1px solid #71928a;border-radius:6px;background:#def0e6}summary{font-weight:600}details{border-top:1px solid #ddd;padding:12px 0}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#edf2ec;padding:12px}table{border-collapse:collapse;width:100%}td,th{text-align:left;padding:5px;border-bottom:1px solid #ddd}blockquote{border-left:3px solid #c79350;margin:10px 0;padding-left:14px}p{white-space:pre-line}a{color:#09624e}#item{width:100%}
+</style><header><small>LLME　／　HugAgent 真人資料</small><h1>從一個人，讀到一道題</h1><div id="stats"></div></header><main>
+<section><h2>資料怎麼切</h2><table><thead><tr><th>領域</th><th>Task 1 · 信念方向</th><th>Task 2 · 立場與理由</th></tr></thead><tbody id="counts"></tbody></table>
+<p>每個數字代表一個 JSONL 檔中的題數。一行是一道題，同一人可以出現多次。每題各自附有可見的訪談；同人、同域、內容與順序相同的 QA 才共用一個訪談編號。</p>
+<button id="demo">看 P07 的 19 段與 20 段訪談</button></section>
+<section><h2>逐題檢視</h2><label>受訪者<select id="person"></select></label><label>領域<select id="domain"></select></label><label>任務<select id="task"></select></label><label style="display:grid">題目<select id="item"></select></label></section>
+<article id="detail"></article><small>本機研究視圖 · HugAgent Authors · CC BY-NC 4.0 · <a href="data/LICENSE">資料授權</a></small></main><script>
+const db=/*DATA*/null;
+const el=id=>document.getElementById(id);
+const esc=v=>String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pretty=v=>'<pre>'+esc(JSON.stringify(v,null,2))+'</pre>';
+const domains={healthcare:'醫療',surveillance:'公共監控',zoning:'都市分區'};
+const kind=x=>x.row.source_qa?'Task 1':'Task 2';
+const distinct=a=>[...new Set(a)].sort();
+const people=distinct(db.items.map(x=>x.row.participant_id));
+const byId=new Map(db.items.map(x=>[x.row.item_id,x]));
+function options(id,values,labels,selected){el(id).replaceChildren(...values.map((v,i)=>new Option(labels[i],v)));if(values.includes(selected))el(id).value=selected}
+el('stats').textContent=people.length+' 人　／　'+db.items.length.toLocaleString()+' 題　／　'+db.scopes.length+' 份訪談輸入';
+for(const [key,label] of Object.entries(domains)){const rows=db.items.filter(x=>x.row.topic===key);el('counts').innerHTML+='<tr><th>'+label+'</th><td>'+rows.filter(x=>kind(x)==='Task 1').length+'</td><td>'+rows.filter(x=>kind(x)==='Task 2').length+'</td></tr>'}
+options('person',people,people);
+function refresh(target){const r=target?.row;if(r)el('person').value=r.participant_id;
+let rows=db.items.filter(x=>x.row.participant_id===el('person').value);
+const ds=distinct(rows.map(x=>x.row.topic));options('domain',ds,ds.map(d=>domains[d]),r?.topic||el('domain').value);
+rows=rows.filter(x=>x.row.topic===el('domain').value);
+const ts=distinct(rows.map(kind));options('task',ts,ts,target?kind(target):el('task').value);
+rows=rows.filter(x=>kind(x)===el('task').value);const ids=rows.map(x=>x.row.item_id);
+options('item',ids,rows.map(x=>x.row.item_id+' · '+(x.row.question_type||'belief_attribution')),r?.item_id);render()}
+function qa(q){return '<b>'+esc(q.question)+'</b><blockquote>'+esc(q.answer)+'</blockquote>'}
+function render(){const x=byId.get(el('item').value),r=x.row,h=db.scopes[x.scope],related=db.items.filter(y=>y.scope===x.scope);
+const leak=x.leak&&byId.get(x.leak[0]);
+const scoring=r.source_qa?{answer:r.answer,reasoning:r.reasoning,source_qa:r.source_qa}:{user_answer:r.user_answer};
+el('detail').innerHTML='<small>'+esc(x.file)+' · 第 '+x.line+' 行 · <a href="https://github.com/'+db.source.repository+'/blob/'+db.source.revision+'/Benchmark/data/'+x.file+'#L'+x.line+'">fork 原檔</a></small><h2>'+esc(r.participant_id)+' ／ '+domains[r.topic]+' ／ '+kind(x)+'</h2><h3>預測器看到的問題</h3><code>task_question</code><p>'+esc(r.task_question)+'</p>'+pretty(r.answer_options||{scale:r.scale,...(r.reason_text?{reason_text:r.reason_text}:{})})+'<details><summary>受訪背景 · demographics</summary>'+pretty(r.demographics)+'</details><details><summary>可見訪談 · context_qas · '+h.length+' 段</summary><p>Raw 直接讀這些 QA。Graph 預計從同一份 QA 抽取主張與引文，Flat 再將相同主張攤成文字。目前可檢視原始證據。</p>'+h.map((q,i)=>'<small>第 '+(i+1)+' 段 · 原編號 '+esc(q.question_number)+'</small><p>'+qa(q)+'</p>').join('')+'</details><details><summary>共用訪談 #'+(x.scope+1)+' 的 '+related.length+' 道題</summary>'+related.map(y=>'<button data-id="'+esc(y.row.item_id)+'">'+esc(y.row.item_id)+'</button>').join(' ')+'</details><details><summary>揭開評分欄位'+(leak?'與跨題洩漏對照':'')+'</summary>'+pretty(scoring)+(leak?'<h3>若按人合併會看到什麼？</h3><p>本題遮住的 source_qa，在另一題 '+db.scopes[leak.scope].length+' 段訪談的第 '+(x.leak[1]+1)+' 段逐字出現。</p>'+qa(db.scopes[leak.scope][x.leak[1]])+'<button data-id="'+leak.row.item_id+'">查看 '+leak.row.item_id+'</button>':'')+'</details><details><summary>完整 JSONL 原始欄位</summary>'+pretty({...r,context_qas:h})+'</details>';
+}
+function demo(){refresh(byId.get('belief_state_inference-surveillance-0009'));el('detail').querySelectorAll('details')[3].open=true}
+el('detail').onclick=e=>{if(e.target.dataset.id)refresh(byId.get(e.target.dataset.id))};
+el('demo').onclick=()=>{demo();el('detail').scrollIntoView()};for(const id of ['person','task','domain'])el(id).onchange=()=>refresh();el('item').onchange=render;
+refresh(byId.get('belief_state_inference-surveillance-0009'));
+</script></html>

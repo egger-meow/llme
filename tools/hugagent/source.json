@@ -1,0 +1,12 @@
+{
+  "files": {
+    "belief_state_inference_zoning.jsonl": "c6a1ea9f19fac5c200c5816c3a51d1a25858c71fa05cc05e706c46515d117255",
+    "belief_state_inference_healthcare.jsonl": "129760d0b7c6a9298f2313da0b4f1b652f6e1ee8cc82985fe2d808e55bd5710c",
+    "belief_state_inference_surveillance.jsonl": "611f2794ef7dc11006b411e9f6ce10cd136ece7590034c97e84a615900bb3b2a",
+    "belief_dynamics_update_surveillance.jsonl": "71b4fa27ef1ced59391f79a4a8005c7a6cbe297cfd80a9a28505b445241b24b7",
+    "belief_dynamics_update_zoning.jsonl": "4eb20ebb50aa38f2d9faae8b8c7735acc3f3624c5e51631e25c77a4c1a16dae0",
+    "belief_dynamics_update_healthcare.jsonl": "14477b9f47844311aa69b3f906c4b56f366662e252c6824ddff7d06911243e23"
+  },
+  "revision": "ea0d98111394a017be79cf7a1e6accbe47e95559",
+  "repository": "egger-meow/HugAgent"
+}
