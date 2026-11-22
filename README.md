@@ -4,7 +4,7 @@
 
 | 從哪裡讀 | 內容 |
 |---|---|
-| [Graph、Tree 與 LLM 接口審核稿](docs/graph-tree-design.md) | 看 P46 的同一個子情境如何記下例外與理由，以及 LLM 如何寫入、引用與更正推論。末段記錄已同意的推論原則與待審的例外門檻。 |
+| [Graph、Tree 與 LLM 接口審核稿](docs/graph-tree-design.md) | P46 的真例與 W7 工廠的兄弟分支，說明何時要跨分支查例外，以及不同情境如何引用本人重視的概念。末段記錄已同意的推論原則與待審設計。 |
 | [第一輪實驗資料](docs/hugagent/prepared-data.md) | 直接取用 Raw 輸入、建圖用訪談、考題與評分答案，以及逐人題數和離線驗收方式 |
 | [會後現況與預期差異](docs/hugagent/meeting-brief.md) | 從 W7、W8 的構想到資料實查，說明洩漏如何改變建圖方式、第一輪能回答什麼，以及不同結果如何解讀 |
 | [會議與第一輪決策](docs/hugagent/round-one.md) | W7、W8 到這輪設計的沿革、資料核對、比較的解讀、後續實作入口 |
