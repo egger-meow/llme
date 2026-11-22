@@ -1,0 +1,170 @@
+.claim-graph {
+  --cg-ink: #173f3b;
+  --cg-line: #53857e;
+  --cg-border: #98b5ad;
+  container-type: inline-size;
+  min-width: 0;
+  color: var(--cg-ink);
+}
+
+.claim-graph .cg-lane {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 2fr);
+  align-items: center;
+}
+
+.claim-graph .cg-lane + .cg-lane { margin-top: 0.65rem; }
+
+.claim-graph .cg-origin,
+.claim-graph .cg-target {
+  position: relative;
+  border: 1px solid var(--cg-border);
+  border-radius: 0.4rem;
+  padding: 0.48rem 0.55rem;
+  background: #fdfffc;
+  text-align: center;
+  font-size: 0.95rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.claim-graph .cg-origin {
+  margin-right: 0.85rem;
+  background: #e8f1ec;
+  font-weight: 650;
+}
+
+.claim-graph .cg-origin::after {
+  position: absolute;
+  content: "";
+  left: calc(100% + 1px);
+  top: 50%;
+  width: 0.85rem;
+  border-top: 2px solid var(--cg-line);
+}
+
+.claim-graph .cg-branches { display: grid; grid-auto-rows: 1fr; }
+
+.claim-graph .cg-branch {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.95fr);
+  align-items: center;
+  gap: 0.68rem;
+  padding: 0.32rem 0 0.32rem 0.62rem;
+}
+
+.claim-graph .cg-branch::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: 0;
+  right: 0;
+  top: 50%;
+  border-top: 2px solid var(--cg-line);
+}
+
+.claim-graph .cg-branch::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-left: 2px solid var(--cg-line);
+}
+
+.claim-graph .cg-branch:first-child::before { top: 50%; }
+.claim-graph .cg-branch:last-child::before { bottom: 50%; }
+
+.claim-graph .cg-target::before {
+  content: "";
+  position: absolute;
+  right: 100%;
+  top: calc(50% - 0.26rem + 1px);
+  border-top: 0.26rem solid transparent;
+  border-bottom: 0.26rem solid transparent;
+  border-left: 0.42rem solid var(--cg-line);
+}
+
+.claim-graph .cg-edge,
+.claim-graph .cg-ref {
+  box-sizing: border-box;
+  color: #184941;
+  border: 1px solid #83a89d;
+  border-radius: 0.35rem;
+  background: #fff;
+  cursor: pointer;
+  font: inherit;
+}
+
+.claim-graph .cg-edge {
+  justify-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.1rem 0.35rem;
+  max-width: 100%;
+  min-height: 2.25rem;
+  padding: 0.25rem 0.36rem;
+  font-size: 0.875rem;
+  line-height: 1.3;
+}
+
+.claim-graph .cg-id,
+.claim-graph .cg-ref {
+  font-family: "IBM Plex Mono", Consolas, monospace;
+  font-size: 0.875rem;
+}
+
+.claim-graph .cg-edge:hover,
+.claim-graph .cg-ref:hover { background: #deeee6; }
+
+.claim-graph button[aria-pressed="true"] {
+  background: #22584f;
+  color: white;
+  border-color: #22584f;
+}
+
+.claim-graph button:focus-visible { outline: 3px solid #b96230; outline-offset: 2px; }
+
+.claim-graph .cg-note {
+  display: block;
+  color: #73502e;
+  font-size: 0.77rem;
+  line-height: 1.5;
+}
+
+.claim-graph .cg-replaced .cg-target { border-style: dashed; }
+.claim-graph .cg-replaced::after { border-top-style: dashed; }
+
+.claim-graph .cg-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.38rem 1rem;
+  padding-top: 0.62rem;
+  margin-top: 0.48rem;
+  border-top: 1px solid #ccdad4;
+}
+
+.claim-graph .cg-link { display: inline-flex; gap: 0.32rem; align-items: center; }
+.claim-graph .cg-ref { min-height: 1.75rem; padding: 0.05rem 0.29rem; }
+.claim-graph .cg-link-label { font-size: 0.875rem; }
+
+@container (max-width: 24rem) {
+  .claim-graph .cg-lane { grid-template-columns: minmax(0, 1fr); }
+  .claim-graph .cg-origin { justify-self: start; max-width: 100%; margin: 0 0 0.48rem; }
+  .claim-graph .cg-origin::after {
+    top: calc(100% + 1px);
+    left: calc(0.72rem - 1px);
+    width: 0;
+    height: 0.48rem;
+    border: 0;
+    border-left: 2px solid var(--cg-line);
+  }
+  .claim-graph .cg-branches { margin-left: 0.72rem; }
+  .claim-graph .cg-branch:first-child::before { top: 0; }
+  .claim-graph .cg-branch { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+}

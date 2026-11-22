@@ -47,14 +47,28 @@ return '<h3>'+task+' · '+group.length+' 題</h3>'+group.map(y=>'<button data-id
 }).join('')+'</details><details><summary>揭開評分欄位'+(leak?'與跨題洩漏對照':'')+'</summary>'+pretty(scoring)+(leak?'<h3>若按人合併會看到什麼？</h3><p>本題遮住的 source_qa，在另一題 '+db.scopes[leak.scope].length+' 段訪談的第 '+(x.leak[1]+1)+' 段逐字出現。</p>'+qa(db.scopes[leak.scope][x.leak[1]])+'<button data-id="'+leak.row.item_id+'">查看 '+leak.row.item_id+'</button>':'')+'</details><details><summary>完整 JSONL 原始欄位</summary>'+pretty({...r,context_qas:h})+'</details>';
 }
 function demo(){refresh(byId.get('belief_state_inference-surveillance-0009'));el('detail').querySelectorAll('details')[3].open=true}
+function showInterviewQA(number){
+  const match=el('qa-'+number);
+  if(!match)return false;
+  match.closest('details').open=true;
+  match.scrollIntoView();
+  return true;
+}
+function openLinkedItem(){
+  const params=new URLSearchParams(location.hash.slice(1));
+  const target=byId.get(params.get('item'));
+  refresh(target||byId.get('belief_state_inference-surveillance-0009'));
+  if(!target)return;
+  const number=params.get('qa');
+  if(!/^[1-9]\d*$/.test(number)||!showInterviewQA(number))el('detail').scrollIntoView();
+}
 el('detail').onclick=e=>{if(e.target.dataset.id)refresh(byId.get(e.target.dataset.id))};
 el('demo-t2').onclick=()=>{
 const t1=byId.get('belief_state_inference-surveillance-0009');
 refresh(byId.get(t1.leak[0]));
-const match=el('qa-'+(t1.leak[1]+1));
-match.closest('details').open=true;
-match.scrollIntoView();
+showInterviewQA(t1.leak[1]+1);
 };
 el('demo').onclick=()=>{demo();el('detail').scrollIntoView()};for(const id of ['person','task','domain'])el(id).onchange=()=>refresh();el('item').onchange=render;
-refresh(byId.get('belief_state_inference-surveillance-0009'));
+window.addEventListener('hashchange',openLinkedItem);
+openLinkedItem();
 </script></html>

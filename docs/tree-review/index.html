@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>個人情境樹 · LLMe</title>
+  <link rel="stylesheet" href="review.css">
+  <link rel="stylesheet" href="graph.css">
+  <script defer src="examples.js"></script>
+  <script defer src="claim-graph.js"></script>
+  <script defer src="review.js"></script>
+</head>
+<body>
+  <header class="mast">
+    <div class="wrap mast-inner">
+      <div class="wordmark"><i class="mark" aria-hidden="true"></i> LLMe <span>研究設計</span></div>
+      <a href="../graph-tree-design.md">設計審核稿 v0.4</a>
+    </div>
+  </header>
+  <main class="wrap">
+    <div class="heading">
+      <div><h1>個人情境樹</h1>
+        <p id="case-intro">從一個人的角色或議題往下看，找出什麼條件會改變他的判斷。</p>
+      </div>
+      <div id="case-switch" class="switch" role="group" aria-label="選擇設計案例"></div>
+    </div>
+    <noscript>請開啟瀏覽器的 JavaScript 以操作這棵樹。</noscript>
+    <div class="workspace">
+      <section class="board" aria-labelledby="case-title">
+        <header class="board-head">
+          <div><span class="eyeline" id="case-type"></span><h2 id="case-title"></h2></div>
+          <div class="legend"><span><i class="tree-line"></i>情境分枝</span><span><i class="graph-line"></i>節點內的圖</span></div>
+        </header>
+        <div id="map"></div>
+      </section>
+      <aside class="rail" aria-label="選取內容與情境試讀">
+        <section class="inspector">
+          <div class="tabs" role="group" aria-label="檢視方式">
+            <button data-mode="inspect" aria-pressed="true">看選取內容</button>
+            <button data-mode="trial" aria-pressed="false">換條件試讀</button>
+          </div>
+          <div id="inspector-body"></div>
+        </section>
+        <details class="reading">
+          <summary>這棵樹怎麼讀？</summary>
+          <ol>
+            <li><b>選大情境。</b>從議題或生活角色進入。兩個入口有時會通到同一個節點。</li>
+            <li><b>追局部條件。</b>一條分枝代表更窄的情境。兩個兄弟分枝的條件也可能同時成立。</li>
+            <li><b>點圖裡的箭頭。</b>每條箭頭是一項判斷。「覆寫」會指出這個條件改變了哪一項原判斷。</li>
+          </ol>
+          <p>本頁供研究者審核設計。第一輪 Raw、Graph、Flat 各自只讀該題允許的訪談；這裡的試讀不會成為實驗輸入。</p>
+        </details>
+      </aside>
+    </div>
+    <footer>LLMe · 個人理解研究 <span>架構審核中</span></footer>
+  </main>
+</body>
+</html>
