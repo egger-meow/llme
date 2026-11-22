@@ -19,6 +19,22 @@
 
 ## 本機真人資料瀏覽器
 
+### 第一輪 runner
+
+從 repo 根目錄使用 Python 3.11 以上。下列命令可離線驗證資料路由、三組各 1,742 格作答及官方評分。fixture 使用固定 A／1 與合法空圖，僅用來檢查管線。輸出目錄在 Git 忽略的 `ref/experiments/`。
+
+```powershell
+python -m llme.run --output ref/experiments/plan-v1 preflight
+python -m llme.inference --run fixture-v1 --offline-fixture
+python -m llme.run --output ref/experiments/fixture-v1/report score --responses ref/experiments/fixture-v1
+```
+
+正式執行時在本機環境設定 `GEMINI_API_KEY` 和 `GEMINI_MODEL`（確切模型 ID）。金鑰只放環境變數。例：`python -m llme.inference --run google-v1 --max-calls 10` 最多送出十次請求，先進行建圖。相同命令從 SQLite 已保存的工作繼續，每次執行有新的請求額度。此上限以次數計，費用上限須另在供應端管理。請勿對同一 run 同時啟動兩個程序。更換模型或抽取程式須使用新的 run 名稱。完成後以同一個 score 指令換成該 run 的路徑評分。報告目錄必須是新目錄。[Google 模型端點](https://ai.google.dev/api/generate-content)
+
+每份訪談只交一次完整 JSON 提議，原提議和已接受的快照存於 `events.sqlite`。格式與引用驗證失敗會留下拒絕原因，該訪談的 Graph／Flat 以缺答計分。服務連線錯誤會中止，可續跑。報表含三組官方分數、逐題 CSV、配對差值與區間 HTML、理由排序 CSV。進階多批修圖、人工盲審及費率預檢仍依研究計畫擴充。
+
+### 瀏覽原始資料
+
 以瀏覽器開啟 [HugAgent 資料檢視器](ref/HugAgent/index.html)。資料來源改為 [egger-meow/HugAgent 固定版本](https://github.com/egger-meow/HugAgent/tree/2bbd18e76db4be1de3b5bce3b5e239898a6a2750/Benchmark/data)。六份 JSONL 與 LICENSE 放在 `ref/HugAgent/data`，在 repo 根目錄執行 `python tools/hugagent/build.py` 可驗證六檔雜湊並重建 HTML。下載檔與含訪談的 HTML 依設定留在本機。
 
 同步後的 fork 六份真人 JSONL 均與研究設計記錄的 data-v1.1 SHA-256 相符。
