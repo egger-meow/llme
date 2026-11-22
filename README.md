@@ -4,13 +4,15 @@
 
 | 從哪裡讀 | 內容 |
 |---|---|
+| [第一輪實驗實作計畫](docs/hugagent/experiment-plan.md) | 研究者審核入口。從 460 份允許訪談走到三組模型預測、離線重播與成本，列出工作順序和驗收方式。 |
+| [LLM 接口](docs/hugagent/experiment-interfaces.md) · [結果表與分析計畫](docs/hugagent/analysis-plan.md) · [本週八分鐘 meeting](docs/hugagent/meeting-experiment-plan.md) | 核對模型能讀寫什麼、哪些結果能回答原問題，以及如何用 P07 的真題向老師說明。 |
 | [互動式個人情境樹](docs/tree-review/index.html) | 直接用瀏覽器開啟。在 P46 的都市分區分枝內展開局部條件樹，點節點內的關係箭頭讀主張與訪談依據；切到工廠案例可檢查兩個兄弟分枝同時生效。 |
 | [Graph、Tree 與 LLM 接口審核稿](docs/graph-tree-design.md) | P46 的真例與 W7 工廠的兄弟分支，說明何時要跨分支查例外，以及不同情境如何引用本人重視的概念。末段記錄已同意的推論原則與待審設計。 |
 | [第一輪實驗資料](docs/hugagent/prepared-data.md) | 直接取用 Raw 輸入、建圖用訪談、考題與評分答案，以及逐人題數和離線驗收方式 |
 | [會後現況與預期差異](docs/hugagent/meeting-brief.md) | 從 W7、W8 的構想到資料實查，說明洩漏如何改變建圖方式、第一輪能回答什麼，以及不同結果如何解讀 |
 | [會議與第一輪決策](docs/hugagent/round-one.md) | W7、W8 到這輪設計的沿革、資料核對、比較的解讀、後續實作入口 |
 | [完整研究設計](docs/hugagent/HugAgent-54-Research-Design.md) | 提供的原稿。含六筆真題、圖語義、工具操作、網站布局、跨域與 Rank |
-| [原始實作 prompt](docs/hugagent/LLME-Implementation-Prompt.md) | 保留原稿供未來 coding agent 參考。第一輪請從決策文件末段的交接指令開始 |
+| [原始實作 prompt](docs/hugagent/LLME-Implementation-Prompt.md) | 保留原稿供查閱。後續實作以研究者審核後的第一輪實驗計畫與接口為準。 |
 | [W7](meetings/W7.pdf) · [W8](meetings/w8.pdf) | 兩次會議投影片 |
 
 資料已準備到可以接實驗程式。54 位受訪者的 1,742 道題已逐題核對官方 Raw 輸入，460 份訪談各自保留原本能看的 QA。可直接查[每人各域的題數](ref/HugAgent/prepared/participant_counts.csv)與[本機資料版本清單](ref/HugAgent/prepared/manifest.json)。下一階段是實驗環境、建圖與模型預測。

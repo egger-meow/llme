@@ -83,4 +83,6 @@
 
 ## 可貼給未來本機 coding agent 的第一輪指令
 
+2026-11-23 新增[實驗實作計畫](experiment-plan.md)、[接口](experiment-interfaces.md)與[分析計畫](analysis-plan.md)。下段保留較早的交接構想。正式開工前，以研究者審核後的契約與設定為準。
+
 > 請先讀 repo 的 README、這份第一輪決策，再讀同目錄的 LLME-Implementation-Prompt.md 作詳細合約。現在受託實作域內 54 人、1,742 題的 Raw／Graph／Flat、官方 scorer、離線 Rank、逐題檢視及重播。先用固定 GitHub revision 核對六檔、460 份輸入、271 道洩漏風險與兩個免模型基準。若用 HF 替代，先核對 HF 自己的 revision、欄位解碼與逐列等價性。依本文件的失敗分母、渲染對照與可見範圍驗收。fixture 完成後凍結 manifest；正式推論使用已指定的模型端點和核定預算。交付時列出實際資料／基準驗證、模型結果或阻礙，以及可重播的逐題追蹤。跨域、Tree 消融、時間更新、檢索與模型編輯，等第一輪結果和下一次研究決策後另行排程。
