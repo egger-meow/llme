@@ -135,6 +135,9 @@ def build(folder):
     tmp = path.with_suffix(".html.tmp")
     tmp.write_text(template.replace("__DATA__", json.dumps(data, ensure_ascii=False).replace("<",r"\u003c")), encoding="utf8")
     tmp.replace(path)
+    if data["scores"]:
+        from .summary import export_summary
+        export_summary(folder, data)
     return path
 
 
