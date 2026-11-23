@@ -8,13 +8,23 @@ const d=JSON.parse(document.querySelector('#data').textContent), el=id=>document
 function add(parent,tag,value){const n=document.createElement(tag);n.textContent=value;parent.append(n);return n}
 el('mode').textContent=d.model+' ｜ 此頁為匯出當下的紀錄';
 const total=d.rows.reduce((n,r)=>n+r.questions.length,0);
+const buildLabels={strict:'原始格式通過',recovered:'已修復格式',partial:'保留部分主張',evidence_only:'使用訪談原文作答',empty:'無可用主張'};
 for(const [label,n,max] of [['準備訪談',d.rows.length,d.rows.length],['建圖並驗證快照',d.rows.filter(r=>r.status==='已重播').length,d.rows.length],['逐題執行 Raw、Graph、Flat',d.completed,total*3],['官方評分',Object.keys(d.scores).length,3]]){
 add(el('flow'),'div',label+'　'+n+' / '+max);const bar=add(el('flow'),'progress','');bar.max=max;bar.value=n}
+const counts=new Map();
+for(const r of d.rows){const status=r.recovery?.status;if(status && status!=='strict')counts.set(status,(counts.get(status)||0)+1)}
+if(counts.size)add(el('flow'),'p',Array.from(counts,([status,n])=>(buildLabels[status]||status)+' '+n+' 份訪談').join(' ｜ '));
 function show(){
 const h=el('history');h.replaceChildren();const r=d.rows[el('scope').value];if(!r){add(h,'p','查無相符考題');return;}
-add(h,'p',r.status+' ｜ '+r.history.length+' 段訪談 ｜ '+r.edits.length+' 筆新增主張');
-if(r.error)add(h,'p',r.error);
-if(r.status==='已重播')add(h,'p',(r.legacy?'舊版紀錄，由保存的回覆重建。':'已比對保存的操作鏈。')+'同一次建圖回覆依序套用各筆主張，最終 Graph 與 Flat 均已比對快照。');
+const rec=r.recovery, referenceOnly=rec?.status==='evidence_only';
+const editCount=r.edits.length+(referenceOnly?' 筆原文證據':' 筆新增主張');
+add(h,'p',r.status+' ｜ '+r.history.length+' 段訪談 ｜ '+editCount);
+if(rec){add(h,'strong',buildLabels[rec.status]||rec.status);
+add(h,'p','採用的模型主張 '+rec.accepted+' 筆'+(rec.total==null?'':'，共提出 '+rec.total+' 筆')+'。'+(referenceOnly?'Graph 和 Flat 使用這份訪談的原問原答作為證據。':''));
+if(rec.issues?.length){const issues=add(h,'details','');add(issues,'summary','查看格式與證據檢查紀錄（'+rec.issues.length+'）');for(const issue of rec.issues)add(issues,'p',typeof issue==='string'?issue:JSON.stringify(issue))}}
+if(r.error)add(h,'p','原始建圖回覆的驗證紀錄　'+r.error);
+if(r.status==='已重播')add(h,'p',(r.legacy?'舊版紀錄，由保存的回覆重建。':'已比對保存的操作鏈。')+'最終 Graph 與 Flat 均已比對快照。');
+if(Object.hasOwn(r,'builder_text')){const original=add(h,'details','');add(original,'summary','查看模型建圖的原始回覆'+(r.finish?'（'+r.finish+'）':''));add(original,'pre',r.builder_text||'模型沒有傳回文字。')}
 const qa=add(h,'details','');add(qa,'summary','閱讀這次建圖可用的訪談');for(const q of r.history){add(qa,'p',q.evidence_id+'　'+q.question);add(qa,'blockquote',q.answer)}
 if(r.edits.length){
 const label=add(h,'label','重播到第幾筆操作　'),slider=add(label,'input','');slider.type='range';slider.min=0;slider.max=r.edits.length;slider.value=r.edits.length;
@@ -26,7 +36,7 @@ const qs=add(h,'details','');add(qs,'summary','使用這份訪談的 '+r.questio
 const arm=add(qs,'details','');add(arm,'summary',a+'　作答 '+(q.answers[a]??'缺答')+(q.metrics?' ｜ 得分或誤差 '+q.metrics[a]:''));
 if(Object.hasOwn(q.answers,a)){add(arm,'p',q.system);const context=a==='raw'?r.history.map((x,i)=>'Q'+(i+1)+': '+x.question+'\nA'+(i+1)+': '+x.answer).join('\n\n'):r.views[a];add(arm,'pre',q.before+context+q.after)}
 if(location.hash.slice(1)===q.id)qs.open=true;}}}
-function filter(){const s=el('scope'),term=el('search').value.toLowerCase();s.replaceChildren();d.rows.forEach((r,i)=>{if(r.questions.some(q=>q.id.includes(term))){const opt=add(s,'option',r.questions[0].id+' 等 '+r.questions.length+' 題');opt.value=i}});show()}
+function filter(){const s=el('scope'),term=el('search').value.toLowerCase();s.replaceChildren();d.rows.forEach((r,i)=>{if(r.questions.some(q=>q.id.includes(term))){const state=r.recovery?.status;const name=r.questions[0].id+' 等 '+r.questions.length+' 題';const opt=add(s,'option',state&&state!=='strict'?name+' ｜ '+(buildLabels[state]||state):name);opt.value=i}});show()}
 el('scope').onchange=show;el('search').oninput=filter;el('search').value=location.hash.slice(1);filter();
 const results=el('results');if(Object.keys(d.scores).length){const t=add(results,'table',''),tr=add(t,'tr','');for(const k of ['組別','T1 正確率 ↑','T2 平均誤差 ↓'])add(tr,'th',k);
 for(const [arm,s] of Object.entries(d.scores)){const row=add(t,'tr','');for(const v of [arm,s.bsi_acc==null?'—':s.bsi_acc.toFixed(2)+'%',s.bdu_mae?.toFixed(3)??'—'])add(row,'td',v)}

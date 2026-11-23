@@ -17,6 +17,16 @@ def table(stage, name, header, rows):
         writer.writerows(rows)
 
 
+def snapshot_claims(events, sid):
+    journal = events.get("journal/" + sid)
+    if journal is not None:
+        return [edit["claim"] for edit in journal]
+    if "build_status/" + sid in events:
+        raise ValueError(f"Missing build journal for recovered snapshot: {sid}")
+    # Early runs saved the validated response and snapshot without a journal.
+    return json.loads(events[sid]["response"])["claims"]
+
+
 def diagnostics(stage, responses, items, predictions, strict):
     by_id = {it["item_id"]: it for it in items}
     with (PACKAGE/"items.csv").open(encoding="utf8") as stream:
@@ -91,14 +101,17 @@ def diagnostics(stage, responses, items, predictions, strict):
     scopes=defaultdict(list)
     for iid,r in routes.items():
         scopes[r["scope_id"]].append(iid)
+    claims_by_scope = {sid: snapshot_claims(events, sid) for sid in scopes if "snapshot/" + sid in events}
     for sid,ids in scopes.items():
-        accepted="snapshot/"+sid in events
-        claims=json.loads(events[sid]["response"])["claims"] if accepted else []
+        claims=claims_by_scope.get(sid, [])
+        build=events.get("build_status/"+sid, {})
+        status=build.get("status", "accepted" if sid in claims_by_scope else "failed")
         quotes={c["evidence_id"] for c in claims}
         quotes.update(ref["evidence_id"] for c in claims for ref in c.get("additional_evidence",[]))
-        scope_rows.append((sid,len(ids),routes[ids[0]]["qa_count"],"accepted" if accepted else "failed",len(claims),len(quotes),
-                           sum(c["basis"]=="inferred" for c in claims),sum(c["overrides"] is not None for c in claims)))
-    table(stage,"scope_quality","scope items passages status claims cited_passages inferred overrides",scope_rows)
+        scope_rows.append((sid,len(ids),routes[ids[0]]["qa_count"],status,len(claims),len(quotes),
+                           sum(c["basis"]=="inferred" for c in claims),sum(c["overrides"] is not None for c in claims),
+                           build.get("total"),json.dumps(build.get("issues", []), ensure_ascii=False)))
+    table(stage,"scope_quality","scope items passages status claims cited_passages inferred overrides proposed_claims build_issues",scope_rows)
     table(stage,"scope_amortization","scope arm planned_items calls complete cold_tokens metered_tokens tokens_per_item upper_rate_usd upper_rate_usd_per_item",amortized(scopes,events))
     costs=[]
     for key,e in events.items():
@@ -129,7 +142,7 @@ def diagnostics(stage, responses, items, predictions, strict):
     table(stage,"audit_samples","item_id scope_id task stratum",review)
 
     from .blind import packets
-    packets(stage, events, routes, review)
+    packets(stage, claims_by_scope, routes, review)
 
     label = "離線合成回覆驗證" if events["config"][0] else "正式模型作答"
     links = ["official_scores", "paired_differences", "item_results", "item_changes",

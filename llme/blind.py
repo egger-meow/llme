@@ -7,18 +7,14 @@ from collections import defaultdict
 from .run import PACKAGE, records
 
 
-def packets(stage, events, routes, review):
+def packets(stage, claims, routes, review):
     rng = random.Random(20261123)
     histories = {r["scope_id"]: r["context_qas"] for r in records(PACKAGE/"inputs/histories.jsonl")}
     questions = {r["item_id"]: r["prediction"]["task_question"] for r in records(PACKAGE/"inputs/questions.jsonl")}
     topics = {r["scope_id"]: r["topic"] for r in routes.values()}
     eligible = defaultdict(list)
-    for sid in sorted(histories):
-        if "snapshot/"+sid in events:
-            eligible[topics[sid]].append(sid)
-    claims = {}
-    for sid in histories:
-        claims[sid] = json.loads(events[sid]["response"])["claims"] if "snapshot/"+sid in events else []
+    for sid in sorted(claims):
+        eligible[topics[sid]].append(sid)
     panels = []
     for domain, ids in sorted(eligible.items()):
         for sid in rng.sample(ids,min(10,len(ids))):
@@ -36,7 +32,7 @@ def packets(stage, events, routes, review):
             for qa in rng.sample(history,min(2,len(history))):
                 panels.append(("coverage",sid,None,None,dict(qa=qa,claims=claims[sid]),qa["evidence_id"]))
     for iid,sid,task,outcome in review:
-        panels.append(("case",sid,iid,outcome,dict(question=questions[iid],history=histories[sid],claims=claims[sid]),None))
+        panels.append(("case",sid,iid,outcome,dict(question=questions[iid],history=histories[sid],claims=claims.get(sid,[])),None))
     rng.shuffle(panels)
     dest=stage/"reviewer"
     dest.mkdir()

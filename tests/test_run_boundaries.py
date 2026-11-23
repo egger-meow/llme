@@ -65,20 +65,50 @@ class RunBoundaryTest(unittest.TestCase):
         with patch.object(sys,"argv",argv),patch.object(inference,"gemini",provider or self.provider):
             inference.main()
 
-    def test_resume_reject_and_tamper(self):
+    def test_resume_partial_finish_and_tamper(self):
         with self.assertRaises(SystemExit):
             self.invoke(1)
         self.invoke(8)
-        self.assertEqual(len(self.sent),6)
+        self.assertEqual(len(self.sent),8)
         self.invoke(1)
-        self.assertEqual(len(self.sent),6)
+        self.assertEqual(len(self.sent),8)
         for arm in ARMS:
-            self.assertEqual([r["response"] for r in records(self.folder/f"{arm}.jsonl")],["2","2" if arm=="raw" else None])
+            self.assertEqual([r["response"] for r in records(self.folder/f"{arm}.jsonl")],["2","2"])
         audit.build(self.folder)
         with closing(sqlite3.connect(self.folder/"events.sqlite")) as db, db:
             db.execute("UPDATE events SET payload=json_set(payload,'$.user','wrong scope') WHERE id='graph/q1'")
         with self.assertRaisesRegex(ValueError,"Prediction request mismatch"):
             audit.build(self.folder)
+
+    def test_unreadable_builder_still_runs_all_predictions(self):
+        def broken_builder(model, system, user, structured):
+            reply = self.provider(model, system, user, structured)
+            if structured:
+                reply.update(text="broken JSON", finish="MAX_TOKENS")
+            return reply
+        self.invoke(8, provider=broken_builder)
+        self.assertEqual(len(self.sent), 8)
+        data = audit.inspect_run(self.folder, self.folder/"report")
+        for scope in data["rows"]:
+            self.assertEqual(scope["builder_text"], "broken JSON")
+            self.assertEqual(scope["recovery"]["status"], "evidence_only")
+            self.assertEqual(scope["edits"][0]["claim"]["quote"], scope["history"][0]["answer"])
+            self.assertEqual(scope["questions"][0]["answers"], dict(raw="2",graph="2",flat="2"))
+
+    def test_recover_claims_without_retargeting_exceptions(self):
+        history = [dict(evidence_id="e001", question="Policy?", answer="Usually yes except Friday.")]
+        base = dict(holder="self", about="policy", source="policy", relation="supports",
+                    target="adoption", outcome="yes", basis="explicit", quote="Usually yes",
+                    evidence_id="e001")
+        rows = [dict(base,quote="made up"), base,
+                dict(base,quote="except Friday", overrides=1, condition="Friday"),
+                dict(base,quote="except Friday", overrides=2, condition="Friday")]
+        claims, _, result = inference.recover_build(json.dumps(rows), history)
+        self.assertEqual((result["status"], result["accepted"]), ("partial", 2))
+        self.assertEqual(claims[1]["overrides"], 1)
+        truncated = '{"claims":[' + json.dumps(base) + ',{"holder":'
+        claims, _, result = inference.recover_build(truncated, history)
+        self.assertEqual((result["status"], len(claims)), ("partial", 1))
 
     def test_delivery_unknown_and_version_drift(self):
         def timeout(*_):

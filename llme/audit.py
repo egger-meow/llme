@@ -6,7 +6,7 @@ import sqlite3
 from contextlib import closing
 from pathlib import Path
 
-from .inference import render
+from .inference import recover_build, render
 from .journal import commits
 from .run import ARMS, PACKAGE, records, verify
 
@@ -34,10 +34,32 @@ def inspect_run(folder, report):
         builder_prompt = events.get("provenance",{}).get("builder_prompt")
         if sid in events and builder_prompt and events[sid]["system"] != builder_prompt:
             raise ValueError(f"Builder instructions mismatch: {sid}")
-        if snapshot is not None and "reject/"+sid in events:
+        recovery = events.get("build_status/" + sid)
+        rejection = events.get("reject/" + sid)
+        if recovery is not None and snapshot is None:
+            raise ValueError(f"Build outcome lacks snapshot: {sid}")
+        if snapshot is not None and rejection is not None and recovery is None:
             raise ValueError(f"Conflicting scope outcomes: {sid}")
+        if rejection is not None:
+            try:
+                render(json.loads(events[sid]["response"]), qa)
+            except (ValueError, KeyError, TypeError) as error:
+                if str(error) != rejection:
+                    raise ValueError(f"Rejection reason mismatch: {sid}") from error
+            else:
+                raise ValueError(f"Accepted proposal marked rejected: {sid}")
+            result["error"] = rejection
+        if sid in events:
+            result["builder_text"] = events[sid].get("text", events[sid]["response"])
+            result["finish"] = events[sid].get("finish")
         if snapshot is not None:
-            claims = json.loads(events[sid]["response"])["claims"]
+            if recovery is None:
+                claims = json.loads(events[sid]["response"])["claims"]
+            else:
+                claims, replay_views, replay_status = recover_build(result["builder_text"], qa)
+                if replay_status != recovery or replay_views != snapshot:
+                    raise ValueError(f"Build recovery replay mismatch: {sid}")
+                result["recovery"] = recovery
             edits = list(commits(sid, qa, claims))
             journal = events.get("journal/" + sid)
             if (journal is not None or "provenance" in events) and journal != edits:
@@ -45,15 +67,8 @@ def inspect_run(folder, report):
             if render({"claims": [e["claim"] for e in edits]}, qa) != snapshot:
                 raise ValueError(f"Snapshot mismatch: {sid}")
             result.update(status="已重播", edits=edits, legacy=journal is None, views=snapshot)
-        elif "reject/" + sid in events:
-            try:
-                render(json.loads(events[sid]["response"]),qa)
-            except (ValueError,KeyError,TypeError) as error:
-                if str(error)!=events["reject/"+sid]:
-                    raise ValueError(f"Rejection reason mismatch: {sid}") from error
-            else:
-                raise ValueError(f"Accepted proposal marked rejected: {sid}")
-            result.update(status="建圖未通過", error=events["reject/" + sid])
+        elif rejection is not None:
+            result["status"] = "建圖未通過"
         rows.append(result)
     scopes = {r["id"]: r for r in rows}
     if "invalid_revision" in events:
@@ -104,7 +119,15 @@ def inspect_run(folder, report):
 def build(folder):
     data = inspect_run(folder, folder/"report")
     pilot = folder/"pilot-scores.json"
-    if pilot.is_file():
+    questions = [q for row in data["rows"] for q in row["questions"]]
+    pending = any(arm not in q["answers"] for row in data["rows"] for q in row["questions"]
+                  for arm in ARMS if arm == "raw" or row["status"] != "建圖未通過")
+    if pilot.is_file() and not pending and all(
+        (folder/f"{arm}.jsonl").is_file()
+        and {r["item_id"]: r["response"] for r in records(folder/f"{arm}.jsonl")}
+            == {q["id"]: q["answers"].get(arm) for q in questions}
+        for arm in ARMS
+    ):
         data["pilot"] = True
         data["scores"] = {arm:s["overall"] for arm,s in json.loads(pilot.read_text(encoding="utf8")).items()}
     template = Path(__file__).with_name("audit.html").read_text(encoding="utf8")

@@ -18,6 +18,7 @@ from urllib.request import Request, urlopen
 
 from .budget import authorize, read_policy, reservation, validate_policy
 from .journal import commits
+from .recovery_run import seed_run
 from .run import ARMS, PACKAGE, ROOT, records, verify
 
 
@@ -92,6 +93,84 @@ def render(proposal, history):
     return {arm: "\n".join(rows) or "No supported claims." for arm, rows in (("graph", nodes+graph), ("flat", flat))}
 
 
+def recover_build(text, history):
+    """Keep every grounded claim we can replay. Never invent a belief to fill a gap."""
+    issues = []
+    body = (text or "").strip()
+    if body.startswith("```") and body.endswith("```") and "\n" in body:
+        body = body.split("\n", 1)[1][:-3].strip()
+        issues.append("Removed Markdown code fence")
+    try:
+        proposal = json.loads(body)
+        if isinstance(proposal, list):
+            rows = proposal
+            issues.append("Wrapped top-level array as claims")
+        elif isinstance(proposal, dict) and isinstance(proposal.get("claims"), list):
+            rows = proposal["claims"]
+            if set(proposal) != {"claims"}:
+                issues.append("Ignored fields outside claims")
+        else:
+            rows = []
+            issues.append("No claims array")
+    except ValueError:
+        rows = []
+        issues.append("Incomplete or unreadable JSON")
+        # Only recover complete entries from the beginning of the intended array.
+        prefix = re.match(r'^\s*(?:\{\s*"claims"\s*:\s*)?\[\s*', body)
+        if prefix:
+            decoder = json.JSONDecoder()
+            tail = body[prefix.end():]
+            while tail:
+                try:
+                    row, end = decoder.raw_decode(tail)
+                except ValueError:
+                    break
+                rows.append(row)
+                tail = tail[end:].lstrip()
+                if not tail.startswith(","):
+                    break
+                tail = tail[1:].lstrip()
+
+    claims, positions = [], {}
+    for original, row in enumerate(rows, 1):
+        try:
+            if not isinstance(row, dict):
+                raise ValueError("Expected a claim object")
+            claim = row.copy()
+            for field in ("condition", "overrides"):
+                if field not in claim:
+                    claim[field] = None
+                    issues.append(f"Claim {original}: defaulted missing {field} to null")
+            parent = claim["overrides"]
+            if parent is not None:
+                if type(parent) is not int or parent not in positions:
+                    raise ValueError("Override refers to unavailable claim")
+                claim["overrides"] = positions[parent]
+            render({"claims": [*claims, claim]}, history)
+        except (ValueError, KeyError, TypeError) as error:
+            issues.append(f"Excluded claim {original}: {error}")
+            continue
+        claims.append(claim)
+        positions[original] = len(claims)
+    accepted = len(claims)
+    if not claims:
+        status = "evidence_only"
+        issues.append("No usable belief claims; retained interview evidence only")
+        for qa in history:
+            if qa["answer"].strip():
+                claims.append(dict(holder="participant", about="interview evidence only",
+                                   source=qa["evidence_id"], relation="records an answer to",
+                                   target=qa["question"], outcome="verbatim interview response",
+                                   condition=None, basis="explicit", evidence_id=qa["evidence_id"],
+                                   quote=qa["answer"], overrides=None))
+    elif accepted < len(rows) or "Incomplete or unreadable JSON" in issues:
+        status = "partial"
+    else:
+        status = "recovered" if issues else "strict"
+    return claims, render({"claims": claims}, history), dict(
+        status=status, issues=issues, accepted=accepted, total=len(rows))
+
+
 def generation_body(system, user, structured):
     config = {"temperature": 0.1, "maxOutputTokens": 8192 if structured else 256}
     if structured:
@@ -156,6 +235,7 @@ def local_settings():
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--run", required=True)
+    parser.add_argument("--recover-from", metavar="RUN", help="Create a derived run using saved model replies and reservations from RUN")
     parser.add_argument("--participant", help="Restrict to one participant, e.g. P07")
     parser.add_argument("--limit", type=int, help="First N eligible questions in dataset order")
     parser.add_argument("--item", help="Exact question ID")
@@ -163,13 +243,15 @@ def main():
     parser.add_argument("--finish", action="store_true", help="Score the selected responses and produce a viewer")
     parser.add_argument("--model", default=os.getenv("GEMINI_MODEL"))
     parser.add_argument("--offline-fixture", action="store_true")
-    parser.add_argument("--exercise-failures", action="store_true", help="Offline-only nonempty synthetic graphs, a rejected scope and mixed predictions")
+    parser.add_argument("--exercise-failures", action="store_true", help="Offline-only nonempty synthetic graphs, an evidence-only fallback scope and mixed predictions")
     parser.add_argument("--max-calls", type=int, default=0, help="Total authorized requests for this invocation")
     parser.add_argument("--retry-uncertain", metavar="JOB", help="Resend this unresolved job after stopping the previous process; may be billed twice")
     parser.add_argument("--policy",type=Path,help="Frozen capacity, prices and generation budget JSON")
     args = parser.parse_args()
     if not re.fullmatch(r"[A-Za-z0-9_-]+", args.run):
         parser.error("Invalid run name")
+    if args.recover_from and not re.fullmatch(r"[A-Za-z0-9_-]+", args.recover_from):
+        parser.error("Invalid source run name")
     if not args.preview and not args.offline_fixture:
         try:
             settings = local_settings()
@@ -261,12 +343,14 @@ def execute(args, inputs, manifest, folder, db):
         origin=dict(commit=git_value("rev-parse","HEAD"), status=git_value("status","--porcelain"))
         db.execute("INSERT INTO events VALUES ('git_origin',?)",(json.dumps(origin),))
     db.execute("CREATE TABLE IF NOT EXISTS attempts (seq INTEGER PRIMARY KEY, job TEXT, started REAL, finished REAL, status TEXT, reserved_micro_usd INTEGER, input_tokens INTEGER)")
+    db.execute("CREATE TABLE IF NOT EXISTS capacity (request_hash TEXT PRIMARY KEY, tokens INTEGER NOT NULL)")
     db.commit()
+    if args.recover_from:
+        seed_run(db, folder, args.recover_from, args.scopes, args.ids)
     if db.execute("SELECT 1 FROM events WHERE id='invalid_revision'").fetchone():
         raise RuntimeError("Mixed provider revisions; use a new run.")
     calls = 0
 
-    db.execute("CREATE TABLE IF NOT EXISTS capacity (request_hash TEXT PRIMARY KEY, tokens INTEGER NOT NULL)")
     def preflight(key, system, user, structured):
         body = generation_body(system,user,structured)
         fingerprint = hashlib.sha256(json.dumps(body, sort_keys=True).encode()).hexdigest()
@@ -347,20 +431,18 @@ def execute(args, inputs, manifest, folder, db):
                          outcome="fixture",condition=None,basis="inferred",evidence_id=example["evidence_id"],
                          quote=example["answer"],overrides=None)
             fixture = "invalid fixture response" if index == 0 else json.dumps({"claims":[claim]})
-        proposal = job(sid, PROMPT, json.dumps(qa, ensure_ascii=False), True, fixture)
-        try:
-            claims = json.loads(proposal)
-            views[sid] = render(claims, qa)
-            snapshot = json.dumps(views[sid], sort_keys=True, ensure_ascii=False)
-            with db:
-                db.execute("INSERT OR IGNORE INTO events VALUES (?,?)", (f"journal/{sid}", json.dumps(list(commits(sid, qa, claims["claims"])))))
-                db.execute("INSERT OR IGNORE INTO events VALUES (?,?)",(f"snapshot/{sid}",snapshot))
-            if db.execute("SELECT payload FROM events WHERE id=?", (f"snapshot/{sid}",)).fetchone()[0] != snapshot:
-                raise RuntimeError("Snapshot replay mismatch")
-        except (ValueError, KeyError, TypeError) as error:
-            views[sid] = None
-            with db:
-                db.execute("INSERT OR IGNORE INTO events VALUES (?,?)",(f"reject/{sid}",json.dumps(str(error))))
+        job(sid, PROMPT, json.dumps(qa, ensure_ascii=False), True, fixture)
+        event = json.loads(db.execute("SELECT payload FROM events WHERE id=?", (sid,)).fetchone()[0])
+        claims, views[sid], status = recover_build(event.get("text", event["response"]), qa)
+        edits = list(commits(sid, qa, claims))
+        with db:
+            for kind, value in (("journal", edits), ("snapshot", views[sid]), ("build_status", status)):
+                key = f"{kind}/{sid}"
+                encoded = json.dumps(value, sort_keys=True, ensure_ascii=False)
+                db.execute("INSERT OR IGNORE INTO events VALUES (?,?)", (key, encoded))
+                if json.loads(db.execute("SELECT payload FROM events WHERE id=?", (key,)).fetchone()[0]) != value:
+                    raise RuntimeError(f"Build replay mismatch: {key}")
+        print(f"  {status['status']}: {status['accepted']}/{status['total']} extracted claims", flush=True)
     outputs = {arm: [] for arm in ARMS}
     prompts = {row["item_id"]: row for row in records(inputs/"raw_prompts.jsonl") if row["item_id"] in args.ids}
     planned = []
@@ -373,9 +455,7 @@ def execute(args, inputs, manifest, folder, db):
         if user.count(blocks[sid]) != 1:
             raise ValueError("History mismatch")
         for arm in ARMS:
-            payload = None
-            if arm == "raw" or views[sid] is not None:
-                payload = user if arm == "raw" else user.replace(blocks[sid], views[sid][arm])
+            payload = user if arm == "raw" else user.replace(blocks[sid], views[sid][arm])
             fixture = "A" if "answer_options" in question["prediction"] else "1"
             if args.exercise_failures and arm != "raw":
                 choice = int(hashlib.sha256((arm+iid).encode()).hexdigest(),16)
@@ -393,11 +473,11 @@ def execute(args, inputs, manifest, folder, db):
             raise SystemExit("Request limit reached after build. Resume to preflight prediction inputs.")
         for index,(arm,iid,system,payload,fixture) in enumerate(planned,1):
             print(f"Check input capacity {index}/{len(planned)} {arm}/{iid}", flush=True)
-            if payload is not None:
+            if not db.execute("SELECT 1 FROM events WHERE id=?", (f"{arm}/{iid}",)).fetchone():
                 preflight(f"{arm}/{iid}",system,payload,False)
     for index,(arm,iid,system,payload,fixture) in enumerate(planned,1):
-        print(f"Predict {index}/{len(planned)} {arm}/{iid}" + (" skipped: rejected graph" if payload is None else ""), flush=True)
-        answer = job(f"{arm}/{iid}",system,payload,fixture=fixture) if payload is not None else None
+        print(f"Predict {index}/{len(planned)} {arm}/{iid}", flush=True)
+        answer = job(f"{arm}/{iid}",system,payload,fixture=fixture)
         outputs[arm].append({"item_id":iid,"response":answer})
     for arm, rows in outputs.items():
         path = folder / f"{arm}.jsonl"

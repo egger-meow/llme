@@ -53,7 +53,7 @@ python -m llme.run --output ref/experiments/fixture-v1/report score --responses 
 
 逐題表同列官方解析與整句嚴格解析。評分頁連到域別、逐題差異、方向配對、Rank 分母及 token 用量表。能從同一份保存的回答重算報告。正式費率與模型容量由研究者在接 key 時填入 policy。盲審只交付 report/reviewer 子目錄；研究者保留 unblinding.csv。依 phase1 先獨立讀原話，再讀 phase2 比較有沒有漏抽。
 
-完整離線故障演練可在新的 run 名稱加上 `--offline-fixture --exercise-failures`，會產生一份拒絕的圖、其餘含主張的圖及不同組別的合成答案。正式模式在第一個預測前先驗全體已渲染 prompt 的 token 數。報表的 artifacts.json 記錄每個檔案與分析程式的 SHA-256，可比對獨立重評結果。
+完整離線故障演練可在新的 run 名稱加上 `--offline-fixture --exercise-failures`，會產生一份僅含原始問答證據的備援圖、其餘含主張的圖及不同組別的合成答案。正式模式在第一個預測前先驗全體已渲染 prompt 的 token 數。報表的 artifacts.json 記錄每個檔案與分析程式的 SHA-256，可比對獨立重評結果。
 
 第一輪範圍、驗收證據及正式開跑邊界整理在[接 key 前的架構驗收](docs/hugagent/pre-key-audit.md)。
 
@@ -67,3 +67,10 @@ python -m llme.inference --run pilot-p07 --participant P07 --limit 1 --max-calls
 ```
 
 第一行只預覽規模。第二行執行單題試跑，最多生成四次。終端機會顯示進度。完成後開啟 `ref/experiments/pilot-p07/audit.html` 看建圖與評分，`usage.json` 記錄 token 與估計費用。進行中可執行 `python -m llme.audit ref/experiments/pilot-p07` 更新 HTML 快照。
+
+
+### 建圖輸出異常與舊實驗補跑
+
+每份訪談都會產生 Graph 和 Flat，兩組使用完全相同的內容。建圖器回傳陣列或省略可選欄位時，程式會修復格式。部分主張無法驗證時，保留能對回原話的主張；完全無可用主張時，逐段保存問答證據並標記 `evidence_only`，繼續三組預測。稽核頁可檢視原始回覆、修復項目與實際送入模型的內容。分析時可依建圖狀態分組。
+
+舊版實驗可在新目錄用 `--recover-from 原run名稱` 補跑。例如 `python -m llme.inference --run p07-recovered --recover-from p07 --participant P07 --max-calls 20 --finish`。沿用原始回覆和預留帳本，只生成缺少的預測。使用個別核准的預算時可另外傳入 `--policy`。
