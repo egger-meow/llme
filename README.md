@@ -56,3 +56,15 @@ python -m llme.run --output ref/experiments/fixture-v1/report score --responses 
 完整離線故障演練可在新的 run 名稱加上 `--offline-fixture --exercise-failures`，會產生一份拒絕的圖、其餘含主張的圖及不同組別的合成答案。正式模式在第一個預測前先驗全體已渲染 prompt 的 token 數。報表的 artifacts.json 記錄每個檔案與分析程式的 SHA-256，可比對獨立重評結果。
 
 第一輪範圍、驗收證據及正式開跑邊界整理在[接 key 前的架構驗收](docs/hugagent/pre-key-audit.md)。
+
+### 從一題開始
+
+先用 `python -m llme.inference --run pilot-p07 --participant P07 --limit 1 --preview` 查看題數、訪談數和生成次數上限。460 是全量資料中不同的可見訪談份數。一題使用一份訪談，最多建圖一次、預測三次。可用 `--item 題目ID` 指定題目。拿掉 `--limit` 可跑該人全部題目，連同 `--participant` 一起拿掉就跑全部人。
+
+設定好上述環境變數和費率預算檔，再執行：
+
+```powershell
+python -m llme.inference --run pilot-p07 --participant P07 --limit 1 --max-calls 4 --policy ref/google-run.json --finish
+```
+
+終端機會顯示當前階段、題號、組別和進度。中途可在另一個終端機執行 `python -m llme.audit ref/experiments/pilot-p07` 更新 HTML 快照。相同名稱、選題、模型與預算設定可續跑，換選題請換 run 名稱。完成後開啟該目錄的 `audit.html` 看建圖紀錄、回答與分數，`usage.json` 有服務端回報的 token、按設定單價估算的已回覆用量金額和保守預留額。加上 `--finish` 會自動評分，全量執行會額外產出完整 report。全量預覽可用 `python -m llme.inference --run full --preview`。

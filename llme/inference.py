@@ -1,9 +1,12 @@
 """Scope-isolated extraction and prediction using Google's generateContent API."""
 import argparse
+import csv
 import hashlib
 import json
 import os
 import re
+import runpy
+import sys
 import sqlite3
 import platform
 import subprocess
@@ -120,6 +123,11 @@ def gemini(model,system,user,structured):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--run", required=True)
+    parser.add_argument("--participant", help="Restrict to one participant, e.g. P07")
+    parser.add_argument("--limit", type=int, help="First N eligible questions in dataset order")
+    parser.add_argument("--item", help="Exact question ID")
+    parser.add_argument("--preview", action="store_true", help="Show selected workload without API calls")
+    parser.add_argument("--finish", action="store_true", help="Score the selected responses and produce a viewer")
     parser.add_argument("--model", default=os.getenv("GEMINI_MODEL"))
     parser.add_argument("--offline-fixture", action="store_true")
     parser.add_argument("--exercise-failures", action="store_true", help="Offline-only nonempty synthetic graphs, a rejected scope and mixed predictions")
@@ -129,11 +137,11 @@ def main():
     args = parser.parse_args()
     if not re.fullmatch(r"[A-Za-z0-9_-]+", args.run):
         parser.error("Invalid run name")
-    if not args.offline_fixture and not (os.getenv("GEMINI_API_KEY") and re.fullmatch(r"[\w.-]+", args.model or "") and args.max_calls > 0):
+    if not args.preview and not args.offline_fixture and not (os.getenv("GEMINI_API_KEY") and re.fullmatch(r"[\w.-]+", args.model or "") and args.max_calls > 0):
         parser.error("Set GEMINI_API_KEY, GEMINI_MODEL and --max-calls")
     if args.exercise_failures and not args.offline_fixture:
         parser.error("--exercise-failures requires --offline-fixture")
-    if not args.offline_fixture and not args.policy:
+    if not args.preview and not args.offline_fixture and not args.policy:
         parser.error("Set --policy using configs/google-run.example.json")
     args.policy = read_policy(args.policy,args.model) if args.policy else None
     inputs = PACKAGE / "inputs"
@@ -141,6 +149,25 @@ def main():
     for name, fingerprint in manifest["files"].items():
         if name.startswith("inputs/"):
             verify(PACKAGE / name, fingerprint)
+    selected = list(records(inputs/"questions.jsonl"))
+    if args.participant:
+        verify(PACKAGE / "items.csv", manifest["files"]["items.csv"])
+        with (PACKAGE / "items.csv").open(encoding="utf8") as stream:
+            eligible = {r["item_id"] for r in csv.DictReader(stream) if r["participant_id"] == args.participant}
+        selected = [r for r in selected if r["item_id"] in eligible]
+    if args.item:
+        selected = [r for r in selected if r["item_id"] == args.item]
+    if args.limit is not None:
+        if args.limit < 1:
+            parser.error("--limit must be positive")
+        selected = selected[:args.limit]
+    if not selected:
+        parser.error("No matching questions")
+    args.ids = {r["item_id"] for r in selected}
+    args.scopes = {r["scope_id"] for r in selected}
+    print(f"{len(args.ids)} questions | {len(args.scopes)} graphs | up to {len(args.scopes)+3*len(args.ids)} generations", flush=True)
+    if args.preview:
+        return
     folder = ROOT / "ref/experiments" / args.run
     folder.mkdir(parents=True, exist_ok=True)
     db = sqlite3.connect(folder / "events.sqlite")
@@ -163,6 +190,10 @@ def execute(args, inputs, manifest, folder, db):
                       builder_generation=generation_body("","",True)["generationConfig"],
                       predictor_generation=generation_body("","",False)["generationConfig"])
     frozen = json.dumps(provenance, sort_keys=True)
+    selection = json.dumps(sorted(args.ids))
+    db.execute("INSERT OR IGNORE INTO events VALUES ('selection',?)", (selection,))
+    if db.execute("SELECT payload FROM events WHERE id='selection'").fetchone()[0] != selection:
+        raise ValueError("Selection changed. Use a new run name.")
     db.execute("INSERT OR IGNORE INTO events VALUES ('provenance',?)", (frozen,))
     if db.execute("SELECT payload FROM events WHERE id='provenance'").fetchone()[0] != frozen:
         raise ValueError("Run environment or source changed. Choose a new run name.")
@@ -243,8 +274,10 @@ def execute(args, inputs, manifest, folder, db):
         return answer
 
     views, blocks = {}, {}
-    for index,row in enumerate(records(inputs / "histories.jsonl")):
+    histories = (r for r in records(inputs / "histories.jsonl") if r["scope_id"] in args.scopes)
+    for index,row in enumerate(histories):
         sid, qa = row["scope_id"], row["context_qas"]
+        print(f"Build {index+1}/{len(args.scopes)} {sid[:12]}", flush=True)
         blocks[sid] = "\n\n".join(f'Q{i}: {q["question"]}\nA{i}: {q["answer"]}' for i,q in enumerate(qa,1))
         fixture = '{"claims":[]}'
         if args.exercise_failures:
@@ -268,10 +301,12 @@ def execute(args, inputs, manifest, folder, db):
             with db:
                 db.execute("INSERT OR IGNORE INTO events VALUES (?,?)",(f"reject/{sid}",json.dumps(str(error))))
     outputs = {arm: [] for arm in ARMS}
-    prompts = {row["item_id"]: row for row in records(inputs/"raw_prompts.jsonl")}
+    prompts = {row["item_id"]: row for row in records(inputs/"raw_prompts.jsonl") if row["item_id"] in args.ids}
     planned = []
     for question in records(inputs/"questions.jsonl"):
         iid, sid = question["item_id"], question["scope_id"]
+        if iid not in args.ids:
+            continue
         raw = prompts.pop(iid)
         system, user = [m["content"] for m in raw["messages"]]
         if user.count(blocks[sid]) != 1:
@@ -295,10 +330,12 @@ def execute(args, inputs, manifest, folder, db):
     if not args.offline_fixture:
         if calls >= args.max_calls:
             raise SystemExit("Request limit reached after build. Resume to preflight prediction inputs.")
-        for arm,iid,system,payload,fixture in planned:
+        for index,(arm,iid,system,payload,fixture) in enumerate(planned,1):
+            print(f"Check input capacity {index}/{len(planned)} {arm}/{iid}", flush=True)
             if payload is not None:
                 preflight(system,payload,False)
-    for arm,iid,system,payload,fixture in planned:
+    for index,(arm,iid,system,payload,fixture) in enumerate(planned,1):
+        print(f"Predict {index}/{len(planned)} {arm}/{iid}" + (" skipped: rejected graph" if payload is None else ""), flush=True)
         answer = job(f"{arm}/{iid}",system,payload,fixture=fixture) if payload is not None else None
         outputs[arm].append({"item_id":iid,"response":answer})
     for arm, rows in outputs.items():
@@ -306,7 +343,39 @@ def execute(args, inputs, manifest, folder, db):
         temporary = path.with_suffix(".tmp")
         temporary.write_text("".join(json.dumps(row)+"\n" for row in rows), encoding="utf8")
         temporary.replace(path)
-    print(folder)
+    reserved = db.execute("SELECT COALESCE(SUM(reserved_micro_usd),0) FROM attempts").fetchone()[0]
+    usage = db.execute("SELECT SUM(json_extract(payload,'$.usage.totalTokenCount')) FROM events WHERE json_valid(payload)").fetchone()[0]
+    summary = {"questions":len(args.ids), "scopes":len(args.scopes), "provider_reported_tokens":usage,
+               "reserved_usd":reserved/1_000_000, "offline_fixture":args.offline_fixture}
+    from .paired import metered
+    estimates = [metered({"usage":json.loads(row[0])},args.policy)[1] for row in
+                 db.execute("SELECT json_extract(payload,'$.usage') FROM events WHERE json_type(payload,'$.usage')='object'")]
+    summary["estimated_usd_for_metered_responses"] = float(sum(v for v in estimates if v is not None)) if any(v is not None for v in estimates) else None
+    (folder/"usage.json").write_text(json.dumps(summary,indent=2),encoding="utf8")
+    print(summary)
+    if args.finish:
+        print("Score selected predictions", flush=True)
+        if len(args.ids) == manifest["items"]:
+            if not (folder/"report").exists():
+                subprocess.run([sys.executable,"-m","llme.run","--output",str(folder/"report"),
+                                "score","--responses",str(folder)], cwd=ROOT, check=True)
+        else:
+            release = PACKAGE.parent
+            scorer = release/"hugagent_eval.py"
+            verify(scorer, manifest["source"]["scorer_sha256"])
+            official = runpy.run_path(str(scorer))
+            items = {}
+            for name, fingerprint in manifest["source"]["files"].items():
+                path = release/"data"/name
+                verify(path, fingerprint)
+                items.update((r["item_id"],r) for r in records(path) if r["item_id"] in args.ids)
+            scores = {}
+            for arm,rows in outputs.items():
+                predictions = {r["item_id"]:official["extract"](items[r["item_id"]],r["response"]) for r in rows}
+                scores[arm] = official["score"](list(items.values()), predictions)
+            (folder/"pilot-scores.json").write_text(json.dumps(scores,indent=2),encoding="utf8")
+    from .audit import build
+    print(build(folder))
 
 
 if __name__ == "__main__":

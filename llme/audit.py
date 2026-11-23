@@ -19,8 +19,14 @@ def inspect_run(folder, report):
     for name in ("inputs/histories.jsonl", "inputs/questions.jsonl", "inputs/raw_prompts.jsonl"):
         verify(PACKAGE / name, files[name])
     rows = []
+    selected = set(events["selection"]) if "selection" in events else None
+    questions = [q for q in records(PACKAGE / "inputs/questions.jsonl")
+                 if selected is None or q["item_id"] in selected]
+    selected_scopes = {q["scope_id"] for q in questions}
     for row in records(PACKAGE / "inputs/histories.jsonl"):
         sid, qa = row["scope_id"], row["context_qas"]
+        if sid not in selected_scopes:
+            continue
         snapshot = events.get("snapshot/" + sid)
         result = dict(id=sid, status="等待建圖", edits=[], questions=[], history=qa)
         if sid in events and json.loads(events[sid]["user"]) != qa:
@@ -55,7 +61,7 @@ def inspect_run(folder, report):
     prompts = {r["item_id"]: r["messages"] for r in records(PACKAGE / "inputs/raw_prompts.jsonl")}
     blocks = {r["id"]: "\n\n".join(f'Q{i}: {qa["question"]}\nA{i}: {qa["answer"]}' for i,qa in enumerate(r["history"],1)) for r in rows}
     completed = 0
-    for q in records(PACKAGE / "inputs/questions.jsonl"):
+    for q in questions:
         iid = q["item_id"]
         answers = {a: events[a+"/"+iid]["response"] for a in ARMS if a+"/"+iid in events}
         system, raw = (m["content"] for m in prompts[iid])
@@ -97,6 +103,10 @@ def inspect_run(folder, report):
 
 def build(folder):
     data = inspect_run(folder, folder/"report")
+    pilot = folder/"pilot-scores.json"
+    if pilot.is_file():
+        data["pilot"] = True
+        data["scores"] = {arm:s["overall"] for arm,s in json.loads(pilot.read_text(encoding="utf8")).items()}
     template = Path(__file__).with_name("audit.html").read_text(encoding="utf8")
     path = folder / "audit.html"
     tmp = path.with_suffix(".html.tmp")

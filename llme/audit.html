@@ -29,5 +29,6 @@ if(location.hash.slice(1)===q.id)qs.open=true;}}}
 function filter(){const s=el('scope'),term=el('search').value.toLowerCase();s.replaceChildren();d.rows.forEach((r,i)=>{if(r.questions.some(q=>q.id.includes(term))){const opt=add(s,'option',r.questions[0].id+' 等 '+r.questions.length+' 題');opt.value=i}});show()}
 el('scope').onchange=show;el('search').oninput=filter;el('search').value=location.hash.slice(1);filter();
 const results=el('results');if(Object.keys(d.scores).length){const t=add(results,'table',''),tr=add(t,'tr','');for(const k of ['組別','T1 正確率 ↑','T2 平均誤差 ↓'])add(tr,'th',k);
-for(const [arm,s] of Object.entries(d.scores)){const row=add(t,'tr','');for(const v of [arm,s.bsi_acc.toFixed(2)+'%',s.bdu_mae.toFixed(3)])add(row,'td',v)}add(results,'a','開啟配對差異圖與 95% 區間').href='report/index.html'}else add(results,'p','等待評分報告。')
+for(const [arm,s] of Object.entries(d.scores)){const row=add(t,'tr','');for(const v of [arm,s.bsi_acc==null?'—':s.bsi_acc.toFixed(2)+'%',s.bdu_mae?.toFixed(3)??'—'])add(row,'td',v)}
+if(d.pilot)add(results,'a','所選題目的評分明細').href='pilot-scores.json';else add(results,'a','開啟配對差異圖與 95% 區間').href='report/index.html'}else add(results,'p','等待評分報告。')
 </script></html>
