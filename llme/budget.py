@@ -6,6 +6,10 @@ from decimal import Decimal, ROUND_CEILING, ROUND_FLOOR
 def read_policy(path, model):
     with path.open(encoding="utf8") as stream:
         policy=json.load(stream)
+    return validate_policy(policy, model)
+
+
+def validate_policy(policy, model):
     if model != policy.get("model") or not policy.get("price_source_date"):
         raise ValueError("Policy needs matching model and dated price source")
     for key in ("budget_usd","input_usd_per_million","output_usd_per_million"):

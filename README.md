@@ -59,12 +59,11 @@ python -m llme.run --output ref/experiments/fixture-v1/report score --responses 
 
 ### 從一題開始
 
-先用 `python -m llme.inference --run pilot-p07 --participant P07 --limit 1 --preview` 查看題數、訪談數和生成次數上限。460 是全量資料中不同的可見訪談份數。一題使用一份訪談，最多建圖一次、預測三次。可用 `--item 題目ID` 指定題目。拿掉 `--limit` 可跑該人全部題目，連同 `--participant` 一起拿掉就跑全部人。
-
-設定好上述環境變數和費率預算檔，再執行：
+將 `.env.example` 複製到 repo 根目錄的 `.env`，把 API key 填在 `GEMINI_API_KEY=` 後面。範本已填入 Gemini 3.5 Flash-Lite 的容量和 Standard 付費文字費率。預算預設為 0.25 美元。容量的單位是每次請求的 token 數，單價是每百萬 token 的美元數。換模型時同步更新容量、單價和查價日期。[官方容量](https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash-lite) · [官方費率](https://ai.google.dev/gemini-api/docs/pricing)
 
 ```powershell
-python -m llme.inference --run pilot-p07 --participant P07 --limit 1 --max-calls 4 --policy ref/google-run.json --finish
+python -m llme.inference --run pilot-p07 --participant P07 --limit 1 --preview
+python -m llme.inference --run pilot-p07 --participant P07 --limit 1 --max-calls 4 --finish
 ```
 
-終端機會顯示當前階段、題號、組別和進度。中途可在另一個終端機執行 `python -m llme.audit ref/experiments/pilot-p07` 更新 HTML 快照。相同名稱、選題、模型與預算設定可續跑，換選題請換 run 名稱。完成後開啟該目錄的 `audit.html` 看建圖紀錄、回答與分數，`usage.json` 有服務端回報的 token、按設定單價估算的已回覆用量金額和保守預留額。加上 `--finish` 會自動評分，全量執行會額外產出完整 report。全量預覽可用 `python -m llme.inference --run full --preview`。
+第一行只預覽規模。第二行執行單題試跑，最多生成四次。終端機會顯示進度。完成後開啟 `ref/experiments/pilot-p07/audit.html` 看建圖與評分，`usage.json` 記錄 token 與估計費用。進行中可執行 `python -m llme.audit ref/experiments/pilot-p07` 更新 HTML 快照。

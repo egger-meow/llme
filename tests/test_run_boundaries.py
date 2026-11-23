@@ -83,7 +83,7 @@ class RunBoundaryTest(unittest.TestCase):
     def test_delivery_unknown_and_version_drift(self):
         def timeout(*_):
             raise TimeoutError
-        with self.assertRaises(TimeoutError):
+        with self.assertRaisesRegex(SystemExit,"--retry-uncertain s1"):
             self.invoke(1,timeout)
         with self.assertRaisesRegex(RuntimeError,"Uncertain delivery"):
             self.invoke(1)
@@ -94,6 +94,15 @@ class RunBoundaryTest(unittest.TestCase):
             self.invoke(1)
         with self.assertRaisesRegex(RuntimeError,"Mixed provider revisions"):
             self.invoke(1)
+    def test_unavailable_model_at_token_count(self):
+        error = inference.HTTPError("unused", 404, "Not Found", {}, None)
+        with patch.object(inference, "count_input", side_effect=error):
+            with self.assertRaisesRegex(SystemExit, "countTokens / s1 .*404"):
+                self.invoke(1)
+        self.assertEqual(self.sent, [])
+        with closing(sqlite3.connect(self.folder/"events.sqlite")) as db:
+            self.assertEqual(db.execute("SELECT count(*) FROM attempts").fetchone()[0], 0)
+
     def test_capacity_and_cumulative_budget_before_generation(self):
         policy=json.loads(self.policy.read_text())
         policy.update(budget_usd=0.009)

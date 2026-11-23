@@ -11,11 +11,12 @@ import sqlite3
 import platform
 import subprocess
 import time
-from urllib.error import HTTPError
+from http.client import HTTPException
+from urllib.error import HTTPError, URLError
 from pathlib import Path
 from urllib.request import Request, urlopen
 
-from .budget import authorize, read_policy, reservation
+from .budget import authorize, read_policy, reservation, validate_policy
 from .journal import commits
 from .run import ARMS, PACKAGE, ROOT, records, verify
 
@@ -107,6 +108,20 @@ def post(model, method, body):
         return json.load(response)
 
 
+def provider_failure(model, method, job, error):
+    code = getattr(error, "code", None)
+    hints = {
+        400: "請核對模型、請求格式與 API key。",
+        401: "請檢查 .env 的 GEMINI_API_KEY。",
+        403: "請檢查 API key 的專案權限與限制。",
+        404: "請確認這個模型對目前金鑰開放，並支援此操作。更換模型時請更新 .env 的模型與單價，另取 --run 名稱。",
+        429: "請檢查配額或速率限制，稍後用相同指令續跑。",
+    }
+    detail = f"HTTP {code}" if code else type(error).__name__
+    hint = hints.get(code, "請檢查網路與服務狀態，稍後用相同指令續跑。")
+    return f"實驗暫停：{model} / {method} / {job} ({detail})。{hint} 已完成的工作保存在原 run。"
+
+
 def count_input(model,system,user,structured):
     request = dict(model=f"models/{model}", **generation_body(system,user,structured))
     return post(model,"countTokens", {"generateContentRequest":request})["totalTokens"]
@@ -118,6 +133,24 @@ def gemini(model,system,user,structured):
     answer = "".join(p.get("text", "") for p in candidate.get("content", {}).get("parts", []) if not p.get("thought"))
     return {"text": answer, "finish": candidate.get("finishReason") or result.get("promptFeedback", {}).get("blockReason", "NO_CANDIDATE"),
             "usage": result.get("usageMetadata", {}), "version": result.get("modelVersion"), "request_id": result.get("responseId")}
+
+
+def local_settings():
+    path = ROOT / ".env"
+    if not path.is_file():
+        return {}
+    settings = {}
+    for number, line in enumerate(path.read_text(encoding="utf-8-sig").splitlines(), 1):
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        name, separator, value = line.partition("=")
+        if not separator or not re.fullmatch(r"[A-Za-z_][A-Za-z_0-9]*", name.strip()):
+            raise ValueError(f"Expected NAME=value in .env line {number}")
+        value = value.strip()
+        if len(value) >= 2 and value[0] in ("'", '"') and value[-1] == value[0]:
+            value = value[1:-1]
+        settings[name.strip()] = value
+    return settings
 
 
 def main():
@@ -137,13 +170,34 @@ def main():
     args = parser.parse_args()
     if not re.fullmatch(r"[A-Za-z0-9_-]+", args.run):
         parser.error("Invalid run name")
-    if not args.preview and not args.offline_fixture and not (os.getenv("GEMINI_API_KEY") and re.fullmatch(r"[\w.-]+", args.model or "") and args.max_calls > 0):
-        parser.error("Set GEMINI_API_KEY, GEMINI_MODEL and --max-calls")
+    if not args.preview and not args.offline_fixture:
+        try:
+            settings = local_settings()
+            args.model = args.model or settings.get("GEMINI_MODEL")
+            if settings.get("GEMINI_API_KEY"):
+                os.environ["GEMINI_API_KEY"] = settings["GEMINI_API_KEY"]
+            if not os.getenv("GEMINI_API_KEY"):
+                parser.error("Fill GEMINI_API_KEY in .env")
+            if not re.fullmatch(r"[\w.-]+", args.model or ""):
+                parser.error("Fill GEMINI_MODEL in .env or pass --model")
+            if args.max_calls <= 0:
+                parser.error("--max-calls must be positive")
+            if args.policy is None:
+                policy = {"model": settings.get("GEMINI_MODEL")}
+                for field in ("budget_usd", "input_limit", "output_limit", "input_usd_per_million",
+                              "output_usd_per_million", "price_source_date"):
+                    name = "GEMINI_" + field.upper()
+                    if not settings.get(name):
+                        parser.error(f"Fill {name} in .env using .env.example")
+                    value = settings[name]
+                    policy[field] = int(value) if field.endswith("_limit") else value
+                args.policy = validate_policy(policy, args.model)
+        except (ValueError, ArithmeticError) as error:
+            parser.error(str(error))
     if args.exercise_failures and not args.offline_fixture:
         parser.error("--exercise-failures requires --offline-fixture")
-    if not args.preview and not args.offline_fixture and not args.policy:
-        parser.error("Set --policy using configs/google-run.example.json")
-    args.policy = read_policy(args.policy,args.model) if args.policy else None
+    if isinstance(args.policy, Path):
+        args.policy = read_policy(args.policy, args.model)
     inputs = PACKAGE / "inputs"
     manifest = json.loads((PACKAGE / "manifest.json").read_text(encoding="utf8"))
     for name, fingerprint in manifest["files"].items():
@@ -213,11 +267,15 @@ def execute(args, inputs, manifest, folder, db):
     calls = 0
 
     db.execute("CREATE TABLE IF NOT EXISTS capacity (request_hash TEXT PRIMARY KEY, tokens INTEGER NOT NULL)")
-    def preflight(system, user, structured):
+    def preflight(key, system, user, structured):
         body = generation_body(system,user,structured)
         fingerprint = hashlib.sha256(json.dumps(body, sort_keys=True).encode()).hexdigest()
         cached = db.execute("SELECT tokens FROM capacity WHERE request_hash=?", (fingerprint,)).fetchone()
-        tokens = cached[0] if cached else count_input(args.model,system,user,structured)
+        try:
+            tokens = cached[0] if cached else count_input(args.model,system,user,structured)
+        except (URLError, TimeoutError, HTTPException, ConnectionError, ValueError, KeyError) as error:
+            raise SystemExit(provider_failure(args.model, "countTokens", key, error)
+                             + " 本題尚未送出這次生成請求。") from None
         amount = reservation(args.policy,tokens,body["generationConfig"]["maxOutputTokens"])
         if not cached:
             with db:
@@ -240,7 +298,7 @@ def execute(args, inputs, manifest, folder, db):
             if calls >= args.max_calls:
                 raise SystemExit("Request limit reached. Saved work can be resumed.")
             calls += 1
-            tokens, amount = preflight(system,user,structured)
+            tokens, amount = preflight(key,system,user,structured)
             with db:
                 db.execute("BEGIN IMMEDIATE")
                 if db.execute("SELECT 1 FROM events WHERE id=?", (key,)).fetchone():
@@ -256,7 +314,10 @@ def execute(args, inputs, manifest, folder, db):
             except HTTPError as error:
                 with db:
                     db.execute("UPDATE attempts SET finished=?, status=? WHERE seq=?", (time.time(), f"HTTP {error.code}", attempt))
-                raise
+                raise SystemExit(provider_failure(args.model, "generateContent", key, error)) from None
+            except (URLError, TimeoutError, HTTPException, ConnectionError, ValueError) as error:
+                raise SystemExit(provider_failure(args.model, "generateContent", key, error)
+                                 + f" 送達狀態未確認。確認可接受重複計費後，才加 --retry-uncertain {key} 續跑。") from None
         answer = reply["text"] if reply["finish"] == "STOP" else None
         drift = False
         with db:
@@ -333,7 +394,7 @@ def execute(args, inputs, manifest, folder, db):
         for index,(arm,iid,system,payload,fixture) in enumerate(planned,1):
             print(f"Check input capacity {index}/{len(planned)} {arm}/{iid}", flush=True)
             if payload is not None:
-                preflight(system,payload,False)
+                preflight(f"{arm}/{iid}",system,payload,False)
     for index,(arm,iid,system,payload,fixture) in enumerate(planned,1):
         print(f"Predict {index}/{len(planned)} {arm}/{iid}" + (" skipped: rejected graph" if payload is None else ""), flush=True)
         answer = job(f"{arm}/{iid}",system,payload,fixture=fixture) if payload is not None else None
@@ -379,4 +440,7 @@ def execute(args, inputs, manifest, folder, db):
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except (ValueError, RuntimeError, FileNotFoundError, sqlite3.OperationalError, ArithmeticError) as error:
+        sys.exit(f"實驗停止：{error}")
