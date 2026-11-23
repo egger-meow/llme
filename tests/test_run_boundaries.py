@@ -14,6 +14,9 @@ from llme import inference, audit
 from llme.run import ARMS, records
 
 
+count_google_input = inference.count_input
+
+
 class RunBoundaryTest(unittest.TestCase):
     def setUp(self):
         tmp = tempfile.TemporaryDirectory()
@@ -120,3 +123,24 @@ class RunBoundaryTest(unittest.TestCase):
             inference.render({"claims":[base,dict(child,basis="inferred")]},history)
         with self.assertRaisesRegex(ValueError,"Unsupported additional"):
             inference.render({"claims":[dict(base,additional_evidence=[dict(role="challenges",evidence_id="e002",quote="invented")])]},history)
+    def test_google_request_shape_and_truncated_reply(self):
+        import io
+        sent=[]
+        def transport(req, timeout):
+            sent.append((req.full_url,json.loads(req.data)))
+            if req.full_url.endswith(":countTokens"):
+                result={"totalTokens":42}
+            else:
+                result={"candidates":[{"finishReason":"MAX_TOKENS","content":{"parts":[{"text":"partial"}]}}],
+                        "modelVersion":"test-version","responseId":"test-request","usageMetadata":{"promptTokenCount":42}}
+            return io.BytesIO(json.dumps(result).encode())
+        with patch.object(inference,"urlopen",side_effect=transport):
+            counted=count_google_input("local","system","user",True)
+            reply=inference.gemini("local","system","user",True)
+        self.assertEqual(counted,42)
+        body=sent[0][1]["generateContentRequest"].copy()
+        self.assertEqual(body.pop("model"),"models/local")
+        self.assertEqual(body,sent[1][1])
+        self.assertEqual(body["systemInstruction"]["parts"][0]["text"],"system")
+        self.assertEqual(body["generationConfig"]["responseMimeType"],"application/json")
+        self.assertEqual((reply["finish"],reply["text"]),("MAX_TOKENS","partial"))

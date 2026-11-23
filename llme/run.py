@@ -110,6 +110,9 @@ def main():
         create_plan(stage, manifest)
         if args.command == "score":
             score(stage, args.responses, manifest)
+            if (args.responses/"events.sqlite").is_file():
+                from .audit import inspect_run
+                inspect_run(args.responses,stage)
         artifacts = {f.relative_to(stage).as_posix():hashlib.sha256(f.read_bytes()).hexdigest()
                      for f in sorted(stage.rglob("*")) if f.is_file()}
         write_json(stage/"artifacts.json", {"run": args.responses.resolve().name if args.command=="score" else None,

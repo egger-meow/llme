@@ -6,6 +6,7 @@ import os
 import re
 import sqlite3
 import platform
+import subprocess
 import time
 from urllib.error import HTTPError
 from pathlib import Path
@@ -158,10 +159,22 @@ def execute(args, inputs, manifest, folder, db):
     provenance = {"python": platform.python_version(), "files": {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
                   for p in sorted(Path(__file__).parent.glob("*.py"))}, "source": manifest["source"],
                   "policy": args.policy, "model": args.model, "fixture": args.offline_fixture, "exercise_failures": args.exercise_failures, "bootstrap_seed": 20261123}
+    provenance.update(builder_prompt=PROMPT, endpoint="https://generativelanguage.googleapis.com/v1beta",
+                      builder_generation=generation_body("","",True)["generationConfig"],
+                      predictor_generation=generation_body("","",False)["generationConfig"])
     frozen = json.dumps(provenance, sort_keys=True)
     db.execute("INSERT OR IGNORE INTO events VALUES ('provenance',?)", (frozen,))
     if db.execute("SELECT payload FROM events WHERE id='provenance'").fetchone()[0] != frozen:
         raise ValueError("Run environment or source changed. Choose a new run name.")
+    if not db.execute("SELECT 1 FROM events WHERE id='git_origin'").fetchone():
+        def git_value(*args):
+            try:
+                value=subprocess.run(["git",*args],cwd=Path(__file__).parent,capture_output=True,text=True)
+            except FileNotFoundError:
+                return None
+            return value.stdout.strip() if value.returncode==0 else None
+        origin=dict(commit=git_value("rev-parse","HEAD"), status=git_value("status","--porcelain"))
+        db.execute("INSERT INTO events VALUES ('git_origin',?)",(json.dumps(origin),))
     db.execute("CREATE TABLE IF NOT EXISTS attempts (seq INTEGER PRIMARY KEY, job TEXT, started REAL, finished REAL, status TEXT, reserved_micro_usd INTEGER, input_tokens INTEGER)")
     db.commit()
     if db.execute("SELECT 1 FROM events WHERE id='invalid_revision'").fetchone():

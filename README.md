@@ -54,3 +54,5 @@ python -m llme.run --output ref/experiments/fixture-v1/report score --responses 
 逐題表同列官方解析與整句嚴格解析。評分頁連到域別、逐題差異、方向配對、Rank 分母及 token 用量表。能從同一份保存的回答重算報告。正式費率與模型容量由研究者在接 key 時填入 policy。盲審只交付 report/reviewer 子目錄；研究者保留 unblinding.csv。依 phase1 先獨立讀原話，再讀 phase2 比較有沒有漏抽。
 
 完整離線故障演練可在新的 run 名稱加上 `--offline-fixture --exercise-failures`，會產生一份拒絕的圖、其餘含主張的圖及不同組別的合成答案。正式模式在第一個預測前先驗全體已渲染 prompt 的 token 數。報表的 artifacts.json 記錄每個檔案與分析程式的 SHA-256，可比對獨立重評結果。
+
+第一輪範圍、驗收證據及正式開跑邊界整理在[接 key 前的架構驗收](docs/hugagent/pre-key-audit.md)。
