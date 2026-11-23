@@ -8,6 +8,7 @@ import sqlite3
 from pathlib import Path
 from urllib.request import Request, urlopen
 
+from .journal import commits
 from .run import ARMS, PACKAGE, ROOT, records, verify
 
 
@@ -124,9 +125,11 @@ def main():
         blocks[sid] = "\n\n".join(f'Q{i}: {q["question"]}\nA{i}: {q["answer"]}' for i,q in enumerate(qa,1))
         proposal = job(sid, PROMPT, json.dumps(qa, ensure_ascii=False), True, '{"claims":[]}')
         try:
-            views[sid] = render(json.loads(proposal), qa)
+            claims = json.loads(proposal)
+            views[sid] = render(claims, qa)
             snapshot = json.dumps(views[sid], sort_keys=True, ensure_ascii=False)
             with db:
+                db.execute("INSERT OR IGNORE INTO events VALUES (?,?)", (f"journal/{sid}", json.dumps(list(commits(sid, qa, claims["claims"])))))
                 db.execute("INSERT OR IGNORE INTO events VALUES (?,?)",(f"snapshot/{sid}",snapshot))
             if db.execute("SELECT payload FROM events WHERE id=?", (f"snapshot/{sid}",)).fetchone()[0] != snapshot:
                 raise RuntimeError("Snapshot replay mismatch")

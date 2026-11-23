@@ -38,3 +38,9 @@ python -m llme.run --output ref/experiments/fixture-v1/report score --responses 
 以瀏覽器開啟 [HugAgent 資料檢視器](ref/HugAgent/index.html)。資料來源改為 [egger-meow/HugAgent 固定版本](https://github.com/egger-meow/HugAgent/tree/2bbd18e76db4be1de3b5bce3b5e239898a6a2750/Benchmark/data)。六份 JSONL 與 LICENSE 放在 `ref/HugAgent/data`，在 repo 根目錄執行 `python tools/hugagent/build.py` 可驗證六檔雜湊並重建 HTML。下載檔與含訪談的 HTML 依設定留在本機。
 
 同步後的 fork 六份真人 JSONL 均與研究設計記錄的 data-v1.1 SHA-256 相符。
+
+### 實驗流程與建圖重播
+
+執行 `python -m llme.audit ref/experiments/fixture-v1`，用瀏覽器開啟該目錄的 `audit.html`。推論中也能匯出，重新執行即可更新。將官方評分輸出至該次執行的 `report` 子目錄後再次匯出，即可從同頁查看結果和配對差異圖。
+
+每份訪談的起點以 scope 和原始問答計算 SHA-256。每筆新增主張包含完整內容、引文和上一筆雜湊。匯出時重新計算操作鏈、檢查引文並重建 Graph 和 Flat，與保存的快照比對。舊版執行從原始模型回覆重建，畫面會標明。時間軸表示一份提議的套用順序。模型版本更新後重新推論可能產生不同回覆。
