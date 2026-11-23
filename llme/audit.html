@@ -1,5 +1,5 @@
 <!doctype html><html lang="zh-Hant"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>LLME 實驗紀錄</title>
-<style>*{box-sizing:border-box}body{max-width:980px;margin:auto;padding:24px;color:#173632;background:#f5f5ed;font:16px/1.6 system-ui}section,details{background:white;padding:16px;margin:12px 0;border:1px solid #b7cbc6;border-radius:8px}select,input{max-width:100%;font:inherit}p{overflow-wrap:anywhere}blockquote{border-left:4px solid #389884;margin:8px;padding-left:14px}summary{cursor:pointer}th,td{padding:6px;text-align:left}progress{width:100%}</style>
+<style>*{box-sizing:border-box}body{max-width:980px;margin:auto;padding:24px;color:#173632;background:#f5f5ed;font:16px/1.6 system-ui}section,details{background:white;padding:16px;margin:12px 0;border:1px solid #b7cbc6;border-radius:8px}select,input{max-width:100%;font:inherit}p{overflow-wrap:anywhere}blockquote{border-left:4px solid #389884;margin:8px;padding-left:14px}summary{cursor:pointer}pre{white-space:pre-wrap;overflow-wrap:anywhere}th,td{padding:6px;text-align:left}progress{width:100%}</style>
 <h1>LLME 實驗紀錄</h1><p id="mode"></p><section><h2>實驗流程</h2><div id="flow"></div></section>
 <section><h2>建圖歷程</h2><label>依考題編號搜尋訪談 <input id="search" type="search"></label> <label>選擇訪談 <select id="scope"></select></label><div id="history"></div></section>
 <section><h2>三組實驗結果</h2><div id="results"></div></section>
@@ -11,7 +11,7 @@ const total=d.rows.reduce((n,r)=>n+r.questions.length,0);
 for(const [label,n,max] of [['準備訪談',d.rows.length,d.rows.length],['建圖並驗證快照',d.rows.filter(r=>r.status==='已重播').length,d.rows.length],['逐題執行 Raw、Graph、Flat',d.completed,total*3],['官方評分',Object.keys(d.scores).length,3]]){
 add(el('flow'),'div',label+'　'+n+' / '+max);const bar=add(el('flow'),'progress','');bar.max=max;bar.value=n}
 function show(){
-const h=el('history');h.replaceChildren();const r=d.rows[el('scope').value];if(!r)return;
+const h=el('history');h.replaceChildren();const r=d.rows[el('scope').value];if(!r){add(h,'p','查無相符考題');return;}
 add(h,'p',r.status+' ｜ '+r.history.length+' 段訪談 ｜ '+r.edits.length+' 筆新增主張');
 if(r.error)add(h,'p',r.error);
 if(r.status==='已重播')add(h,'p',(r.legacy?'舊版紀錄，由保存的回覆重建。':'已比對保存的操作鏈。')+'同一次建圖回覆依序套用各筆主張，最終 Graph 與 Flat 均已比對快照。');
@@ -21,10 +21,13 @@ const label=add(h,'label','重播到第幾筆操作　'),slider=add(label,'input
 const state=add(h,'div','');function replay(){state.replaceChildren();add(state,'strong','版本 '+slider.value+' / '+r.edits.length);for(const e of r.edits.slice(0,Number(slider.value))){const c=e.claim;add(state,'div',c.source+'　── '+c.relation+' →　'+c.target)}}slider.oninput=replay;replay()}
 for(const [i,e] of r.edits.entries()){const c=e.claim,n=add(h,'details','');add(n,'summary',(i+1)+'　'+c.source+' → '+c.target);add(n,'p',c.source+' — '+c.relation+' → '+c.target+' ｜ '+c.outcome);
 add(n,'p','持有者 '+c.holder+' ｜ 對象 '+c.about+' ｜ 條件 '+(c.condition??'未指定')+' ｜ '+c.basis+(c.overrides?' ｜ 覆寫主張 '+c.overrides:''));
-add(n,'p',c.evidence_id+'　'+r.history.find(q=>q.evidence_id===c.evidence_id).question);add(n,'blockquote',c.quote);add(n,'p','父版本 '+e.parent);add(n,'p','版本 '+e.id)}
-const qs=add(h,'details','');add(qs,'summary','使用這份訪談的 '+r.questions.length+' 道考題與模型作答');for(const q of r.questions){add(qs,'h3',q.id);add(qs,'p',q.prompt);for(const a of ['raw','graph','flat'])add(qs,'p',a+'　'+(q.answers[a]??'無作答紀錄'))}}
+add(n,'p',c.evidence_id+'　'+r.history.find(q=>q.evidence_id===c.evidence_id).question);add(n,'blockquote',c.quote);for(const x of c.additional_evidence||[]){add(n,'p',x.role+' ｜ '+x.evidence_id+'　'+r.history.find(q=>q.evidence_id===x.evidence_id).question);add(n,'blockquote',x.quote)}add(n,'p','父版本 '+e.parent);add(n,'p','版本 '+e.id)}
+const qs=add(h,'details','');add(qs,'summary','使用這份訪談的 '+r.questions.length+' 道考題與模型作答');for(const q of r.questions){add(qs,'h3',q.id).id=q.id;add(qs,'p',q.prompt);for(const a of ['raw','graph','flat']){
+const arm=add(qs,'details','');add(arm,'summary',a+'　作答 '+(q.answers[a]??'缺答')+(q.metrics?' ｜ 得分或誤差 '+q.metrics[a]:''));
+if(Object.hasOwn(q.answers,a)){add(arm,'p',q.system);const context=a==='raw'?r.history.map((x,i)=>'Q'+(i+1)+': '+x.question+'\nA'+(i+1)+': '+x.answer).join('\n\n'):r.views[a];add(arm,'pre',q.before+context+q.after)}
+if(location.hash.slice(1)===q.id)qs.open=true;}}}
 function filter(){const s=el('scope'),term=el('search').value.toLowerCase();s.replaceChildren();d.rows.forEach((r,i)=>{if(r.questions.some(q=>q.id.includes(term))){const opt=add(s,'option',r.questions[0].id+' 等 '+r.questions.length+' 題');opt.value=i}});show()}
-el('scope').onchange=show;el('search').oninput=filter;filter();
+el('scope').onchange=show;el('search').oninput=filter;el('search').value=location.hash.slice(1);filter();
 const results=el('results');if(Object.keys(d.scores).length){const t=add(results,'table',''),tr=add(t,'tr','');for(const k of ['組別','T1 正確率 ↑','T2 平均誤差 ↓'])add(tr,'th',k);
 for(const [arm,s] of Object.entries(d.scores)){const row=add(t,'tr','');for(const v of [arm,s.bsi_acc.toFixed(2)+'%',s.bdu_mae.toFixed(3)])add(row,'td',v)}add(results,'a','開啟配對差異圖與 95% 區間').href='report/index.html'}else add(results,'p','等待評分報告。')
 </script></html>

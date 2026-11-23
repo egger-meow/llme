@@ -4,6 +4,7 @@ import csv
 import hashlib
 import json
 import runpy
+import platform
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -70,7 +71,13 @@ def score(stage, responses, manifest):
             if iid not in by_id or iid in parsed or not (value is None or isinstance(value, str)):
                 raise ValueError(f"Invalid response in {source}: {iid}")
             parsed[iid] = official["extract"](by_id[iid], value)
-            strict[arm][iid] = int(value.strip()) if isinstance(value, str) and value.strip() in ("1","2","3","4","5") else None
+            item = by_id[iid]
+            token = value.strip() if isinstance(value, str) else ""
+            if item["task_type"] == "belief_attribution":
+                strict[arm][iid] = token if token in item["answer_options"] else None
+            else:
+                lo, hi = item["scale"]
+                strict[arm][iid] = int(token) if token in {str(i) for i in range(lo, hi+1)} else None
         if parsed.keys() != by_id.keys():
             raise ValueError(f"Incomplete response set for {arm}")
         report = official["score"](items, parsed)
@@ -79,6 +86,8 @@ def score(stage, responses, manifest):
         write_json(stage / f"{arm}-scores.json", report)
     from .report import export
     export(stage, items, predictions, strict)
+    from .diagnostics import diagnostics
+    diagnostics(stage, responses, items, predictions, strict)
 
 
 def main():
@@ -101,6 +110,12 @@ def main():
         create_plan(stage, manifest)
         if args.command == "score":
             score(stage, args.responses, manifest)
+        artifacts = {f.relative_to(stage).as_posix():hashlib.sha256(f.read_bytes()).hexdigest()
+                     for f in sorted(stage.rglob("*")) if f.is_file()}
+        write_json(stage/"artifacts.json", {"run": args.responses.resolve().name if args.command=="score" else None,
+                  "python": platform.python_version(), "artifact_sha256": artifacts,
+                  "analysis_code": {f.name:hashlib.sha256(f.read_bytes()).hexdigest()
+                                    for f in sorted(Path(__file__).parent.glob("*.py"))}})
         stage.rename(dest)
     print(dest)
 

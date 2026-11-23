@@ -12,7 +12,7 @@ def export(stage, items, predictions, strict):
     differences = []
     with (stage / "item_results.csv").open("w", encoding="utf8", newline="") as stream:
         writer = csv.writer(stream)
-        writer.writerow(("item_id", "person", "domain", "task", "arm", "parsed", "correct_or_error"))
+        writer.writerow(("item_id", "person", "domain", "task", "arm", "parsed", "correct_or_error", "strict_parsed"))
         for item in items:
             iid, person, domain = (item[k] for k in ("item_id", "participant_id", "topic"))
             task = "T1" if "answer_options" in item and item["task_type"] == "belief_attribution" else "T2"
@@ -22,7 +22,7 @@ def export(stage, items, predictions, strict):
                     value = 100 * int(answer in item["answer"].split("/"))
                 else:
                     value = 6 if answer is None else abs(answer-item["user_answer"]) / (2 if item["scale"][1]==10 else 1)
-                writer.writerow((iid, person, domain, task, arm, answer, value))
+                writer.writerow((iid, person, domain, task, arm, answer, value, strict[arm][iid]))
                 cell = cells[task, domain, arm, person]
                 cell[0] += 1
                 cell[1] += value

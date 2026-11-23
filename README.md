@@ -15,7 +15,7 @@
 | [原始實作 prompt](docs/hugagent/LLME-Implementation-Prompt.md) | 保留原稿供查閱。後續實作以研究者審核後的第一輪實驗計畫與接口為準。 |
 | [W7](meetings/W7.pdf) · [W8](meetings/w8.pdf) | 兩次會議投影片 |
 
-資料已準備到可以接實驗程式。54 位受訪者的 1,742 道題已逐題核對官方 Raw 輸入，460 份訪談各自保留原本能看的 QA。可直接查[每人各域的題數](ref/HugAgent/prepared/participant_counts.csv)與[本機資料版本清單](ref/HugAgent/prepared/manifest.json)。下一階段是實驗環境、建圖與模型預測。
+資料已準備到可以接實驗程式。54 位受訪者的 1,742 道題已逐題核對官方 Raw 輸入，460 份訪談各自保留原本能看的 QA。可直接查[每人各域的題數](ref/HugAgent/prepared/participant_counts.csv)與[本機資料版本清單](ref/HugAgent/prepared/manifest.json)。下面的指令可以從建圖一路跑到評分。
 
 ## 本機真人資料瀏覽器
 
@@ -29,9 +29,9 @@ python -m llme.inference --run fixture-v1 --offline-fixture
 python -m llme.run --output ref/experiments/fixture-v1/report score --responses ref/experiments/fixture-v1
 ```
 
-正式執行時在本機環境設定 `GEMINI_API_KEY` 和 `GEMINI_MODEL`（確切模型 ID）。金鑰只放環境變數。例：`python -m llme.inference --run google-v1 --max-calls 10` 最多送出十次請求，先進行建圖。相同命令從 SQLite 已保存的工作繼續，每次執行有新的請求額度。此上限以次數計，費用上限須另在供應端管理。請勿對同一 run 同時啟動兩個程序。更換模型或抽取程式須使用新的 run 名稱。完成後以同一個 score 指令換成該 run 的路徑評分。報告目錄必須是新目錄。[Google 模型端點](https://ai.google.dev/api/generate-content)
+正式執行時在本機環境設定 `GEMINI_API_KEY` 和 `GEMINI_MODEL`（確切模型 ID）。金鑰只放環境變數。例：`python -m llme.inference --run google-v1 --max-calls 10 --policy ref/google-run.json` 最多送出十次請求，先進行建圖。相同命令從 SQLite 已保存的工作繼續，每次執行有新的請求額度。複製 configs/google-run.example.json 到 ref/google-run.json，填寫同一模型 ID、官方輸入／輸出容量、核准的美元預算、適用於所有級距的最高輸入／輸出單價（美元／百萬 token），並記錄費率來源與日期。每次生成前用 Google countTokens 取得完整訊息的輸入數，加上設定的最大輸出預留金額。保守預留跨續跑累計，含送達未知的請求；預留額可能高於最後帳單。--max-calls 只計生成，另有計數請求。請勿對同一 run 同時啟動兩個程序。更換模型或抽取程式須使用新的 run 名稱。完成後以同一個 score 指令換成該 run 的路徑評分。報告目錄必須是新目錄。[Google 模型端點](https://ai.google.dev/api/generate-content)
 
-每份訪談只交一次完整 JSON 提議，原提議和已接受的快照存於 `events.sqlite`。格式與引用驗證失敗會留下拒絕原因，該訪談的 Graph／Flat 以缺答計分。服務連線錯誤會中止，可續跑。報表含三組官方分數、逐題 CSV、配對差值與區間 HTML、理由排序 CSV。進階多批修圖、人工盲審及費率預檢仍依研究計畫擴充。
+每份訪談只交一次完整 JSON 提議，原提議和已接受的快照存於 `events.sqlite`。格式與引用驗證失敗會留下拒絕原因，該訪談的 Graph／Flat 以缺答計分。服務連線錯誤會中止，可續跑。報表含三組官方分數、逐題 CSV、配對差值與區間 HTML、理由排序 CSV。盲審資料包在評分時產生。多批修圖與 Tree 路由留給後續實驗。
 
 ### 瀏覽原始資料
 
@@ -44,3 +44,13 @@ python -m llme.run --output ref/experiments/fixture-v1/report score --responses 
 執行 `python -m llme.audit ref/experiments/fixture-v1`，用瀏覽器開啟該目錄的 `audit.html`。推論中也能匯出，重新執行即可更新。將官方評分輸出至該次執行的 `report` 子目錄後再次匯出，即可從同頁查看結果和配對差異圖。
 
 每份訪談的起點以 scope 和原始問答計算 SHA-256。每筆新增主張包含完整內容、引文和上一筆雜湊。匯出時重新計算操作鏈、檢查引文並重建 Graph 和 Flat，與保存的快照比對。舊版執行從原始模型回覆重建，畫面會標明。時間軸表示一份提議的套用順序。模型版本更新後重新推論可能產生不同回覆。
+
+### 接上金鑰前的架構驗收
+
+用 `python -m unittest discover -s tests -v` 在本機演練截斷回覆、未知送達、中斷後續跑、模型修訂漂移，以及預測 prompt 遭竄改。測試使用自造問答和本機模擬回覆。
+
+每次真實請求先登記 attempt。若送出後連線中斷，下次執行會列出該工作的 ID。確認舊程序已停止，且接受該次可能重複計費，才在原命令加上 `--retry-uncertain JOB`。服務端回傳截斷時會保存原文與結束原因，該工作以失敗計。服務端回報的模型修訂在 run 中改變時，整次 run 標為無效。
+
+逐題表同列官方解析與整句嚴格解析。評分頁連到域別、逐題差異、方向配對、Rank 分母及 token 用量表。能從同一份保存的回答重算報告。正式費率與模型容量由研究者在接 key 時填入 policy。盲審只交付 report/reviewer 子目錄；研究者保留 unblinding.csv。依 phase1 先獨立讀原話，再讀 phase2 比較有沒有漏抽。
+
+完整離線故障演練可在新的 run 名稱加上 `--offline-fixture --exercise-failures`，會產生一份拒絕的圖、其餘含主張的圖及不同組別的合成答案。正式模式在第一個預測前先驗全體已渲染 prompt 的 token 數。報表的 artifacts.json 記錄每個檔案與分析程式的 SHA-256，可比對獨立重評結果。
