@@ -1,0 +1,382 @@
+{
+  "participants": [
+    "P01",
+    "P02",
+    "P03",
+    "P04",
+    "P05",
+    "P06",
+    "P07",
+    "P08",
+    "P09",
+    "P10",
+    "P44"
+  ],
+  "selected_runs": {
+    "P01": "P01-resumed",
+    "P02": "P02",
+    "P03": "P03",
+    "P04": "P04",
+    "P05": "P05",
+    "P06": "P06",
+    "P07": "p07-recovered",
+    "P08": "P08",
+    "P09": "P09",
+    "P10": "P10",
+    "P44": "P44"
+  },
+  "model": [
+    "gemini-3.5-flash-lite"
+  ],
+  "tasks": {
+    "T2": 313,
+    "T1": 67
+  },
+  "scope_status": {
+    "partial": 47,
+    "strict": 39,
+    "evidence_only": 6,
+    "recovered": 2
+  },
+  "question_count_by_scope_status": {
+    "partial": 198,
+    "strict": 155,
+    "evidence_only": 17,
+    "recovered": 10
+  },
+  "official_scores": {
+    "raw": {
+      "overall": {
+        "bsi_acc": 55.36669213139802,
+        "bdu_acc": 55.7909377841973,
+        "bdu_mae": 1.392736865808492,
+        "bdu_dir_acc": 83.07729468599034,
+        "n_items": 380,
+        "unparsed": 6,
+        "ati_unscaled": 0.621234666860192,
+        "ati": 38.66568468524281
+      },
+      "per_domain": {
+        "healthcare": {
+          "n_bsi": 17,
+          "n_bdu": 93,
+          "bsi_acc": 29.41176470588235,
+          "bsi_unparsed": 2,
+          "bdu_acc": 49.46236559139785,
+          "bdu_mae": 1.5376344086021505,
+          "bdu_unparsed": 0,
+          "bdu_dir_pairs": 18,
+          "bdu_dir_acc": 76.66666666666667
+        },
+        "surveillance": {
+          "n_bsi": 22,
+          "n_bdu": 86,
+          "bsi_acc": 54.54545454545455,
+          "bsi_unparsed": 3,
+          "bdu_acc": 50.0,
+          "bdu_mae": 1.5174418604651163,
+          "bdu_unparsed": 0,
+          "bdu_dir_pairs": 23,
+          "bdu_dir_acc": 82.56521739130434
+        },
+        "zoning": {
+          "n_bsi": 28,
+          "n_bdu": 134,
+          "bsi_acc": 82.14285714285714,
+          "bsi_unparsed": 1,
+          "bdu_acc": 67.91044776119404,
+          "bdu_mae": 1.123134328358209,
+          "bdu_unparsed": 0,
+          "bdu_dir_pairs": 6,
+          "bdu_dir_acc": 89.99999999999999
+        }
+      }
+    },
+    "graph": {
+      "overall": {
+        "bsi_acc": 55.27119938884645,
+        "bdu_acc": 50.12260527818521,
+        "bdu_mae": 1.5143810828328974,
+        "bdu_dir_acc": 78.92109500805152,
+        "n_items": 380,
+        "unparsed": 1,
+        "ati_unscaled": 0.5982127792773886,
+        "ati": 32.49979581137514
+      },
+      "per_domain": {
+        "healthcare": {
+          "n_bsi": 17,
+          "n_bdu": 93,
+          "bsi_acc": 35.294117647058826,
+          "bsi_unparsed": 0,
+          "bdu_acc": 45.16129032258065,
+          "bdu_mae": 1.6021505376344085,
+          "bdu_unparsed": 0,
+          "bdu_dir_pairs": 18,
+          "bdu_dir_acc": 76.66666666666667
+        },
+        "surveillance": {
+          "n_bsi": 22,
+          "n_bdu": 86,
+          "bsi_acc": 59.09090909090909,
+          "bsi_unparsed": 0,
+          "bdu_acc": 39.53488372093023,
+          "bdu_mae": 1.6686046511627908,
+          "bdu_unparsed": 0,
+          "bdu_dir_pairs": 23,
+          "bdu_dir_acc": 70.09661835748791
+        },
+        "zoning": {
+          "n_bsi": 28,
+          "n_bdu": 134,
+          "bsi_acc": 71.42857142857143,
+          "bsi_unparsed": 1,
+          "bdu_acc": 65.67164179104478,
+          "bdu_mae": 1.2723880597014925,
+          "bdu_unparsed": 0,
+          "bdu_dir_pairs": 6,
+          "bdu_dir_acc": 89.99999999999999
+        }
+      }
+    },
+    "flat": {
+      "overall": {
+        "bsi_acc": 59.517443340972754,
+        "bdu_acc": 52.39686787368484,
+        "bdu_mae": 1.470817331198471,
+        "bdu_dir_acc": 79.7536231884058,
+        "n_items": 380,
+        "unparsed": 3,
+        "ati_unscaled": 0.6261833040513813,
+        "ati": 39.991064582447855
+      },
+      "per_domain": {
+        "healthcare": {
+          "n_bsi": 17,
+          "n_bdu": 93,
+          "bsi_acc": 47.05882352941177,
+          "bsi_unparsed": 0,
+          "bdu_acc": 41.935483870967744,
+          "bdu_mae": 1.6129032258064515,
+          "bdu_unparsed": 0,
+          "bdu_dir_pairs": 18,
+          "bdu_dir_acc": 75.0
+        },
+        "surveillance": {
+          "n_bsi": 22,
+          "n_bdu": 86,
+          "bsi_acc": 63.63636363636363,
+          "bsi_unparsed": 0,
+          "bdu_acc": 48.83720930232558,
+          "bdu_mae": 1.627906976744186,
+          "bdu_unparsed": 0,
+          "bdu_dir_pairs": 23,
+          "bdu_dir_acc": 74.26086956521738
+        },
+        "zoning": {
+          "n_bsi": 28,
+          "n_bdu": 134,
+          "bsi_acc": 67.85714285714286,
+          "bsi_unparsed": 3,
+          "bdu_acc": 66.41791044776119,
+          "bdu_mae": 1.171641791044776,
+          "bdu_unparsed": 0,
+          "bdu_dir_pairs": 6,
+          "bdu_dir_acc": 89.99999999999999
+        }
+      }
+    }
+  },
+  "fixed_A_1": {
+    "overall": {
+      "bsi_acc": 68.03539597657245,
+      "bdu_acc": 58.55443960492611,
+      "bdu_mae": 1.6753914846870923,
+      "bdu_dir_acc": 14.782608695652174,
+      "n_items": 380,
+      "unparsed": 0,
+      "ati_unscaled": 0.5055185725995215,
+      "ati": 7.673761214022049
+    },
+    "per_domain": {
+      "healthcare": {
+        "n_bsi": 17,
+        "n_bdu": 93,
+        "bsi_acc": 82.3529411764706,
+        "bsi_unparsed": 0,
+        "bdu_acc": 56.98924731182796,
+        "bdu_mae": 1.7956989247311828,
+        "bdu_unparsed": 0,
+        "bdu_dir_pairs": 18,
+        "bdu_dir_acc": 20.0
+      },
+      "surveillance": {
+        "n_bsi": 22,
+        "n_bdu": 86,
+        "bsi_acc": 68.18181818181819,
+        "bsi_unparsed": 0,
+        "bdu_acc": 60.46511627906977,
+        "bdu_mae": 1.4767441860465116,
+        "bdu_unparsed": 0,
+        "bdu_dir_pairs": 23,
+        "bdu_dir_acc": 14.347826086956522
+      },
+      "zoning": {
+        "n_bsi": 28,
+        "n_bdu": 134,
+        "bsi_acc": 53.57142857142857,
+        "bsi_unparsed": 0,
+        "bdu_acc": 58.208955223880594,
+        "bdu_mae": 1.7537313432835822,
+        "bdu_unparsed": 0,
+        "bdu_dir_pairs": 6,
+        "bdu_dir_acc": 10.0
+      }
+    }
+  },
+  "paired_differences": [
+    {
+      "task": "T1",
+      "left": "graph",
+      "right": "flat",
+      "delta": -4.246243952126305,
+      "lo": -17.985739750445635,
+      "hi": 8.174603174603174,
+      "draws": 5000
+    },
+    {
+      "task": "T1",
+      "left": "graph",
+      "right": "raw",
+      "delta": -0.09549274255156587,
+      "lo": -12.962962962962962,
+      "hi": 11.868686868686869,
+      "draws": 5000
+    },
+    {
+      "task": "T1",
+      "left": "flat",
+      "right": "raw",
+      "delta": 4.15075120957474,
+      "lo": -5.988455988455988,
+      "hi": 16.11111111111111,
+      "draws": 5000
+    },
+    {
+      "task": "T2",
+      "left": "graph",
+      "right": "flat",
+      "delta": 0.04356375163442602,
+      "lo": -0.022784961685823755,
+      "hi": 0.11577132194799551,
+      "draws": 5000
+    },
+    {
+      "task": "T2",
+      "left": "graph",
+      "right": "raw",
+      "delta": 0.12164421702440535,
+      "lo": 0.008050232288037164,
+      "hi": 0.23176160337552743,
+      "draws": 5000
+    },
+    {
+      "task": "T2",
+      "left": "flat",
+      "right": "raw",
+      "delta": 0.07808046538997934,
+      "lo": 0.005578879954458123,
+      "hi": 0.1521325378601498,
+      "draws": 5000
+    }
+  ],
+  "t2_by_measure": {
+    "baseline_stance": {
+      "questions": 23,
+      "item_mean_absolute_error": {
+        "raw": 0.5869565217391305,
+        "graph": 0.6739130434782609,
+        "flat": 0.6956521739130435
+      }
+    },
+    "experience_or_perception": {
+      "questions": 35,
+      "item_mean_absolute_error": {
+        "raw": 1.6428571428571428,
+        "graph": 1.6714285714285715,
+        "flat": 1.6857142857142857
+      }
+    },
+    "hypothetical_scenario": {
+      "questions": 34,
+      "item_mean_absolute_error": {
+        "raw": 1.0294117647058822,
+        "graph": 1.0588235294117647,
+        "flat": 1.1470588235294117
+      }
+    },
+    "reason_influence": {
+      "questions": 221,
+      "item_mean_absolute_error": {
+        "raw": 1.4389140271493213,
+        "graph": 1.5972850678733033,
+        "flat": 1.506787330316742
+      }
+    }
+  },
+  "graph_raw_paired_hits": {
+    "T1": {
+      "graph_hit_raw_miss": 9,
+      "graph_miss_raw_miss": 18,
+      "graph_hit_raw_hit": 30,
+      "graph_miss_raw_hit": 10
+    },
+    "T2": {
+      "graph_miss_raw_miss": 123,
+      "graph_hit_raw_miss": 10,
+      "graph_hit_raw_hit": 154,
+      "graph_miss_raw_hit": 26
+    }
+  },
+  "finish_reason": {
+    "T1": {
+      "raw": {
+        "STOP": 61,
+        "MAX_TOKENS": 6
+      },
+      "graph": {
+        "STOP": 66,
+        "MAX_TOKENS": 1
+      },
+      "flat": {
+        "STOP": 64,
+        "MAX_TOKENS": 3
+      }
+    },
+    "T2": {
+      "raw": {
+        "STOP": 313
+      },
+      "graph": {
+        "STOP": 313
+      },
+      "flat": {
+        "STOP": 313
+      }
+    }
+  },
+  "build": {
+    "grounded_claims": 1672,
+    "claims_with_conditions": 323,
+    "overrides": 0,
+    "evidence_only_links": 133
+  },
+  "t1_complete_case": {
+    "questions": 58,
+    "domain_macro_accuracy": {
+      "raw": 59.94152046783625,
+      "graph": 59.3859649122807,
+      "flat": 66.50584795321637
+    }
+  }
+}
