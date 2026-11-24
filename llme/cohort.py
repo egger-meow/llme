@@ -1,4 +1,5 @@
 """Build the local meeting report from the completed HugAgent participant runs."""
+import base64
 import csv
 import json
 import random
@@ -121,7 +122,16 @@ def collect():
                                       gold=it["answer"] if t1 else it["user_answer"], arms=arms))
     cohort = [items[q["id"]] for q in questions]
     scores = {arm: official["score"](cohort, values) for arm, values in predictions.items()}
+    baseline = official["score"](cohort, official["baseline_preds"](cohort, "majority"))["overall"]
+    complete_t1 = [it for it in cohort if routes[it["item_id"]]["task"] == "T1"
+                   and all(predictions[arm][it["item_id"]] is not None for arm in ARMS)]
+    sensitivity = {arm: official["score"](complete_t1, {it["item_id"]: predictions[arm][it["item_id"]]
+                                                        for it in complete_t1})["overall"]["bsi_acc"]
+                   for arm in ARMS}
+    dataset = dict(people=len({r["participant_id"] for r in routes.values()}),
+                   scopes=len({r["scope_id"] for r in routes.values()}), items=len(routes))
     return dict(runs=runs, questions=questions, scopes=scopes, scores=scores,
+                dataset=dataset, baseline=baseline, completeT1=dict(count=len(complete_t1), scores=sensitivity),
                 paired=paired_intervals(questions))
 
 
@@ -132,6 +142,8 @@ def build():
     html = (ASSETS / "index.html").read_text(encoding="utf8")
     for filename in ("report.css", "report.js", "structure.js"):
         html = html.replace("__" + filename + "__", (ASSETS / filename).read_text(encoding="utf8"))
+    figure = ROOT / "docs/hugagent/experiment-01/paired-differences.png"
+    html = html.replace("__PAIRED_FIGURE__", "data:image/png;base64," + base64.b64encode(figure.read_bytes()).decode("ascii"))
     payload = json.dumps(data, ensure_ascii=False, allow_nan=False, separators=(",", ":"))
     tmp = path.with_suffix(".tmp")
     tmp.write_text(html.replace("__DATA__", payload.replace("<", r"\u003c")), encoding="utf8")

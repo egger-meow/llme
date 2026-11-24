@@ -128,7 +128,7 @@ function overview() {
       m.unparsed,
     ];
   });
-  main.innerHTML = `<section class="hero"><small>HugAgent 個人信念預測實驗</small><h1>同一份訪談，哪種表示預測得準？</h1>
+  main.innerHTML = `<section class="hero"><small>HugAgent 第一次實驗 · P01–P10、P44</small><h1>同一份訪談，哪種表示預測得準？</h1>
   <p>在這批受訪者中，${winner("bsi_acc", 1)} 的 T1 正確率最高，${winner("bdu_mae", -1)} 的 T2 平均誤差最低。</p><div class="kpis">${[
     [Object.keys(D.runs).length, "位受訪者"],
     [Q.length, "道考題"],
@@ -137,10 +137,12 @@ function overview() {
   ]
     .map(([v, t]) => `<div><strong>${v.toLocaleString()}</strong><small>${t}</small></div>`)
     .join("")}</div></section>
+  <p class="note">全資料集共有 ${D.dataset.people} 人、${D.dataset.scopes} 份可用訪談、${D.dataset.items.toLocaleString()} 道預測題。一份訪談可供多題共用。本次涵蓋全體題目的 ${fmt(100 * Q.length / D.dataset.items, 1)}%。 ${link("研究背景、比較基準與限制 →", "analysis")}</p>
   <h2>三種模式的表現</h2><p class="subtitle">Raw 讀完整訪談。Graph 讀概念與關係。Flat 讀相同主張與引文的平鋪文字。官方總分先在各領域計算，再給三個領域相同權重。</p>
   <div class="grid3">${charts("bsi_acc", `T1 選擇題正確率 ↑`, "%", 100)}${charts("bdu_acc", "T2 量表容許命中率 ↑", "%", 100)}${charts("bdu_mae", "T2 平均絕對誤差 ↓", "", 6)}</div>
   <p class="subtitle">T1 共 ${t1} 題。T2 共 ${Q.length - t1} 題，10 分量表的誤差除以 2，再與 5 分量表一起計算。</p>
   ${table(["模式", "T1 答對題數", "T2 容許內題數", "立場變化方向分數 ↑", "官方綜合指標 ATI ↑", "缺答或無法解析"], rows)}
+  <details class="box"><summary>ATI 是什麼？如何讀這個分數？</summary><p>ATI（Average-to-Individual）綜合衡量模型能多準確地預測本人的回答。0 分代表論文的隨機猜測水準，100 分代表本人重測水準。40 分表示跨過這兩個參照點之間約四成的距離。</p><p>因果方向題正確率占 50%，量表的立場變化方向分數占 25%，容許命中率與換算後的平均絕對誤差分數各占 12.5%。</p></details>
   <div class="links">${link("查看全部題目 →", "questions")} ${link("看三組判分不同的題目 →", "questions", { result: "split" })} ${link("追查缺答與原始輸出 →", "questions", { result: "blank" })}</div>
   <p class="note">在 ${Q.length - t1} 道量表題上，Graph 的平均誤差比 Raw ${pair.delta >= 0 ? "高" : "低"} ${fmt(Math.abs(pair.delta), 3)} 分。全批共 ${blank.length} 格未解析，其中 ${blank.filter((r) => r.finish === "MAX_TOKENS").length} 格因輸出達 token 上限而以缺答計分。</p>
   <h2>Graph 與 Raw 在哪些題目互有得失？</h2><p class="subtitle">點題數查看題目與三份回答。T2 以是否落在官方容許範圍內判定。</p>
@@ -218,6 +220,25 @@ function overview() {
   }
   byId("group").onchange = groups;
   groups();
+}
+function analysisView() {
+  const sample = [
+    ["受訪者", Object.keys(D.runs).length, D.dataset.people],
+    ["不同的可用訪談", Object.keys(D.scopes).length, D.dataset.scopes],
+    ["預測題目", Q.length, D.dataset.items],
+  ];
+  const methods = [...ARMS.map((a) => [names[a], D.scores[a].overall]), ["固定選 A／固定填 1", D.baseline]];
+  const reason = Q.filter((q) => q.measure === "reason_influence");
+  main.innerHTML = `<h1>研究背景與分析</h1><p class="intro">將一個人的訪談整理成概念與關係後，模型能否更準確地預測這個人怎麼回答？</p>
+  <h2>這次如何比較？</h2><p>每題固定同一位受訪者、同一組允許使用的問答和同一個預測模型（${esc([...new Set(Object.values(D.runs).map((r) => r.model))].join("、"))}）。Raw 讀允許使用的訪談原文，Graph 讀從中整理的節點、關係、條件與引文，Flat 讀同一批主張與引文寫成的句子。Graph 與 Flat 的比較可以觀察同一批內容換一種寫法後，結果如何改變。</p>
+  <h2>第一次實驗占多少？</h2>${table(["單位", "第一次實驗", "全資料集", "涵蓋率"], sample.map(([unit, n, total]) => [unit, n.toLocaleString(), total.toLocaleString(), fmt(100 * n / total, 1) + "%"]))}
+  <p>同一位受訪者在同一領域，只要題目允許看的訪談問答完全相同，就共用一份資料。例如 P01 在都市分區的 22 題共用 1 份訪談。每題各由三種模式作答。 ${link("查看 P01 的都市分區題目 →", "questions", { person: "P01", topic: "zoning" })}</p>
+  <h2>三種模式與固定答案基準</h2>${table(["方法", "T1 正確率 ↑", "T2 平均誤差 ↓", "T2 容許命中率 ↑", "T2 方向分數 ↑", "ATI ↑"], methods.map(([label, m]) => [label, fmt(m.bsi_acc) + "%", fmt(m.bdu_mae, 3), fmt(m.bdu_acc) + "%", fmt(m.bdu_dir_acc) + "%", fmt(m.ati)]))}
+  <p>三種模型中 Flat 的 T1 正確率最高，但在這批題目中，固定選 A 得分更高。Raw 在三個領域的 T2 平均誤差都最低。比較 Graph 與 Raw 時，四種量表題中以「理由影響強度」的誤差差距最大。 ${link("查看這 " + reason.length + " 道理由強度題 →", "questions", { measure: "reason_influence" })}</p>
+  <h2>差距有多確定？</h2><p>橫線是以受訪者為單位重抽 5,000 次得到的 95% 區間。T1 三組比較都跨過零，這 11 人還不足以判定誰穩定領先。T2 中，Graph 和 Flat 相對 Raw 的誤差差都高於零。這批結果只涵蓋一個模型，區間也只反映受訪者之間的變異。</p>
+  <img src="__PAIRED_FIGURE__" style="display:block;max-width:100%;height:auto" alt="三種模式的同題配對差異及 95% 區間。T1 的三個區間均跨過零，T2 的 Graph 減 Raw 與 Flat 減 Raw 均高於零。">
+  <h2>缺答與建圖品質會影響解讀嗎？</h2><p>本次達到輸出長度上限的缺答都出現在 T1。只看三組都有可解析答案的 ${D.completeT1.count} 題時，三域等權正確率為 ${ARMS.map((a) => names[a] + " " + fmt(D.completeT1.scores[a]) + "%").join("、")}。主分析保留全部題目。 ${link("核對缺答與原始輸出 →", "questions", { result: "blank" })}</p>
+  <p>部分訪談只能保留原文證據。引文可以確認主張來源，至於整理後是否保留語氣和強度，需要回到逐題紀錄判讀。Tree 用來檢查已抽取的條件，本次實驗未測量 Tree 的預測表現。 ${link("查看建圖品質與逐人紀錄 →", "process")}</p>`;
 }
 const resultOpts = [
   ["", "全部判分"],
@@ -340,6 +361,7 @@ function render() {
   else if (view === "question" && q) question(s, q);
   else if (view === "graph" || view === "tree") structure(view, q);
   else if (view === "process") processView();
+  else if (view === "analysis") analysisView();
   else overview();
   window.scrollTo(0, 0);
 }
