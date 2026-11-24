@@ -7,6 +7,7 @@
 const d=JSON.parse(document.querySelector('#data').textContent), el=id=>document.getElementById(id);
 function add(parent,tag,value){const n=document.createElement(tag);n.textContent=value;parent.append(n);return n}
 el('mode').textContent=d.model+' ｜ 此頁為匯出當下的紀錄';
+if(d.cohort_person){const a=add(el('mode'),'a','開啟互動報告與三組逐題比較');a.href='../cohort/index.html#view=questions&person='+encodeURIComponent(d.cohort_person)}
 const total=d.rows.reduce((n,r)=>n+r.questions.length,0);
 const buildLabels={strict:'原始格式通過',recovered:'已修復格式',partial:'保留部分主張',evidence_only:'使用訪談原文作答',empty:'無可用主張'};
 for(const [label,n,max] of [['準備訪談',d.rows.length,d.rows.length],['建圖並驗證快照',d.rows.filter(r=>r.status==='已重播').length,d.rows.length],['逐題執行 Raw、Graph、Flat',d.completed,total*3],['官方評分',Object.keys(d.scores).length,3]]){

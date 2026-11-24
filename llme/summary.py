@@ -44,6 +44,8 @@ def export_summary(folder, data):
         for row in rows
     )
     title = f"{escape(folder.name)} 實驗結果"
+    cohort = data.get("cohort_person")
+    explorer = (f'<a href="../cohort/index.html#view=questions&amp;person={escape(cohort)}">互動逐題比較與 Graph／Tree</a> · ' if cohort else "")
     path = folder / "summary.html"
     path.write_text(f"""<!doctype html>
 <html lang="zh-Hant"><meta charset="utf-8">
@@ -59,7 +61,7 @@ th, td {{padding: 8px; border-bottom: 1px solid #ccc; text-align: right}}
 </style>
 <h1>{title}</h1>
 <p>{escape(data["model"])} · {total} 題 · {len(data["rows"])} 份訪談</p>
-<p><a href="summary.csv">下載 CSV</a> · <a href="audit.html">查看逐題與建圖紀錄</a></p>
+<p>{explorer}<a href="summary.csv">下載 CSV</a> · <a href="audit.html">查看逐題與建圖紀錄</a></p>
 <h2>結果總表</h2>
 <div class="table"><table><thead><tr>{headings}</tr></thead><tbody>{tbody}</tbody></table></div>
 {"".join(charts)}

@@ -79,6 +79,7 @@ def inspect_run(folder, report):
     for q in questions:
         iid = q["item_id"]
         answers = {a: events[a+"/"+iid]["response"] for a in ARMS if a+"/"+iid in events}
+        delivery = {a: {k: events[a+"/"+iid].get(k) for k in ("text", "finish")} for a in answers}
         system, raw = (m["content"] for m in prompts[iid])
         sid = q["scope_id"]
         if raw.count(blocks[sid]) != 1:
@@ -91,7 +92,7 @@ def inspect_run(folder, report):
         completed += len(answers)
         before, after = raw.split(blocks[sid])
         scopes[sid]["questions"].append(dict(id=iid, prompt=q["prediction"]["task_question"], answers=answers,
-                 system=system,before=before,after=after))
+                 delivery=delivery,system=system,before=before,after=after))
     scores = {}
     if (report/"index.html").is_file():
         if (report/"artifacts.json").is_file():
@@ -118,6 +119,9 @@ def inspect_run(folder, report):
 
 def build(folder):
     data = inspect_run(folder, folder/"report")
+    if (folder.parent/"cohort/index.html").is_file():
+        from .cohort import RUNS
+        data["cohort_person"] = next((p for p, name in RUNS.items() if name == folder.name), None)
     pilot = folder/"pilot-scores.json"
     questions = [q for row in data["rows"] for q in row["questions"]]
     pending = any(arm not in q["answers"] for row in data["rows"] for q in row["questions"]
